@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Firestore security rules for the Flowline CRM workspace.
+// Deploy via: Firebase console → Firestore Database → Rules, or `firebase deploy --only firestore:rules`
+//
+// Data model: one document per signed-in user, at
+//   /flowline_crm_users/{uid}
+// containing { payload: "<json string of the whole workspace>", updatedAt: <number> }
+//
+// These rules make sure a signed-in user can only ever read or write
+// their own document — never anyone else's — and reject writes that
+// don't match the expected shape.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isWellFormed() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['payload', 'updatedAt'])
+             && data.payload is string
+             && data.payload.size() < 900000   // keep documents comfortably under Firestore's 1MB limit
+             && data.updatedAt is number;
+    }
+
+    match /flowline_crm_users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isWellFormed();
+      allow delete: if isOwner(userId);
+    }
+
+    // Deny everything else by default — no other collection is used by this app,
+    // and this stops any future collection from being open unless a rule is added for it.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
