@@ -55,8 +55,25 @@ signed in), this backend needs to read and write Firestore on its own:
    the app's Development Mode — just make sure your Meta account is listed
    as an Admin under App Roles → Roles. Full App Review is only needed if
    other people's accounts will connect to this app.
-5. From the app dashboard, copy the App ID and App Secret into
+5. **App Review → Permissions and Features** — search for each of these and
+   make sure each one shows as available to your app (there's usually an
+   "Add" or a toggle per permission, even in Development Mode):
+   `pages_show_list`, `pages_read_engagement`, `instagram_basic`,
+   `instagram_manage_insights`. If a permission doesn't show an option to
+   add it at all, your app may need its Instagram Graph API / Facebook Login
+   for Business products re-checked — permissions tied to a product that
+   isn't properly added get rejected wholesale, and Meta's error message
+   often lists every requested scope as "invalid" even when only one or two
+   are actually the problem, which is a common point of confusion.
+6. From the app dashboard, copy the App ID and App Secret into
    `META_APP_ID` and `META_APP_SECRET`.
+
+**If you still get "Invalid Scope" after checking the above:** double-check
+you're using the code from this bundle, not a hand-edited copy — the scope
+list intentionally excludes `instagram_manage_mentions` and
+`business_management`, since both are commonly gated behind extra review and
+aren't needed for the core follower/post sync. Mentions tracking simply won't
+populate without the former; everything else works fine.
 
 ### Step 3 — TikTok app
 This one takes longer than Meta — TikTok's approval process is slower, and
