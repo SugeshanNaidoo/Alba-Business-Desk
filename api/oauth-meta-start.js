@@ -20,11 +20,13 @@ module.exports = async (req, res) => {
     return res.status(500).send('META_APP_ID and APP_BASE_URL must be set on the server first.');
   }
   const redirectUri = `${baseUrl}/api/oauth-meta-callback`;
-  const scope = [
-    'pages_show_list', 'pages_read_engagement',
-    'instagram_basic', 'instagram_manage_insights', 'instagram_manage_mentions',
-    'business_management'
-  ].join(',');
+const scope = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'instagram_basic',
+  'instagram_manage_insights',
+  'business_management'
+].join(',');
   const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code`;
   res.writeHead(302, { Location: url });
   res.end();
