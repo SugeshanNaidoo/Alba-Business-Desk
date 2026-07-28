@@ -150,6 +150,60 @@ it's just more hands-on than Section A.
 
 ---
 
+## Section C — Billing (PayFast subscriptions)
+
+This turns Alba Business Desk into something other businesses pay to use:
+R1000/month, charged automatically every month from the card entered at
+signup. Card details are entered on PayFast's own hosted page — they never
+touch this backend or the CRM directly, so there's no PCI compliance burden
+on your side.
+
+### How it works
+1. A signed-in user clicks "Subscribe" in the CRM → sent to
+   `/api/billing-checkout`, which verifies who they are (their Firebase ID
+   token) and redirects them into a signed PayFast payment form.
+2. They pay on PayFast's page. PayFast redirects them back to the CRM
+   either way (`?billing=success` or `?billing=cancelled`).
+3. Separately — and this is the part that actually matters for security —
+   PayFast sends a server-to-server notification (an "ITN") to
+   `/api/billing-notify` confirming the payment. Only after that
+   notification is validated does the account's subscription get marked
+   active in Firestore. The redirect back to the CRM is just for the
+   person's benefit; it's never trusted on its own to grant access.
+4. Every month, PayFast automatically charges the same card and sends
+   another ITN, keeping the subscription's `lastPaymentAt` current.
+
+### Setup
+1. Sign up at payfast.co.za as a merchant (or use sandbox.payfast.co.za for
+   testing — no real account needed there).
+2. From your PayFast merchant dashboard, copy your **Merchant ID** and
+   **Merchant Key** into `PAYFAST_MERCHANT_ID` and `PAYFAST_MERCHANT_KEY`.
+3. Under Settings → Security, set a **passphrase** (strongly recommended —
+   without one, anyone who knows your merchant ID could forge a fake
+   "payment successful" notification). Put the same value in
+   `PAYFAST_PASSPHRASE`.
+4. While testing, set `PAYFAST_SANDBOX=true` — this points everything at
+   PayFast's sandbox instead of taking real payments. Switch it to `false`
+   (or remove it) when you're ready to go live.
+5. That's it for environment variables — `APP_BASE_URL` and `CRM_URL` from
+   Section A are reused here too.
+
+### Testing before going live
+Use PayFast's sandbox card numbers (in their docs) with `PAYFAST_SANDBOX=true`
+to run a full subscription through end to end — including waiting to confirm
+the ITN actually lands on `/api/billing-notify` and flips the account to
+`active` — before switching to real payments. A payment that "succeeds" on
+PayFast's page but never fires or never validates the ITN is a customer who
+paid but never gets access, which you want to catch in sandbox, not with a
+real customer's money.
+
+### What this does NOT do yet
+This section covers taking the payment and tracking who's paid. It does not
+yet **enforce** that only paying accounts can use the CRM — right now,
+subscription status is visible in Settings, but the app itself doesn't lock
+anyone out for not having paid. That's a deliberate next step, not an
+oversight — ask if you want that built next.
+
 ## Operational notes
 
 - **Rate limits**: daily sync is comfortably under everyone's limits. Don't

@@ -1,15 +1,19 @@
 rules_version = '2';
 
-// Firestore security rules for the Flowline CRM workspace.
+// Firestore security rules for the Alba Business Desk workspace.
 // Deploy via: Firebase console → Firestore Database → Rules, or `firebase deploy --only firestore:rules`
 //
-// Data model: one document per signed-in user, at
-//   /flowline_crm_users/{uid}
-// containing { payload: "<json string of the whole workspace>", updatedAt: <number> }
-//
-// These rules make sure a signed-in user can only ever read or write
-// their own document — never anyone else's — and reject writes that
-// don't match the expected shape.
+// Three collections exist:
+//   /flowline_crm_users/{uid}   — each user's CRM data (contacts, deals, etc.)
+//   /subscriptions/{uid}        — billing status, written ONLY by the backend
+//                                  (via the Admin SDK, which bypasses these
+//                                  rules entirely) after a verified PayFast
+//                                  payment. No client, not even the account
+//                                  owner, can write here — that would let
+//                                  someone grant themselves a free subscription
+//                                  by editing their own document.
+//   /social_connections/{platform} — OAuth tokens for Instagram/Facebook/TikTok,
+//                                  backend-only, never exposed to any client.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -32,8 +36,20 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-    // Deny everything else by default — no other collection is used by this app,
-    // and this stops any future collection from being open unless a rule is added for it.
+    // Billing status: no client access at all, in either direction. The
+    // backend's /api/billing-status endpoint reads this via the Admin SDK
+    // (which isn't subject to these rules) after verifying who's asking.
+    match /subscriptions/{userId} {
+      allow read, write: if false;
+    }
+
+    // OAuth tokens for connected social accounts: backend-only, always.
+    match /social_connections/{platform} {
+      allow read, write: if false;
+    }
+
+    // Deny everything else by default — this stops any future collection
+    // from being open unless a rule is deliberately added for it.
     match /{document=**} {
       allow read, write: if false;
     }

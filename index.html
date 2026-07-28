@@ -937,7 +937,7 @@ tbody tr:last-child td{border-bottom:none;}
           <div class="settings-section" id="settings-social">
             <div class="panel" style="max-width:520px;">
               <div class="panel-head"><h3>Social integrations</h3></div>
-              <p class="topbar-sub" style="margin-bottom:12px;">Paste the URL where you deployed the Instagram/Facebook/TikTok backend (see the README in the social-integrations bundle), then connect your accounts below.</p>
+              <p class="topbar-sub" style="margin-bottom:12px;">Paste the URL where you deployed the backend (see the README in the social-integrations bundle) — it handles social sync, OAuth connections, and billing, all from the same deployment.</p>
               <div class="field">
                 <label>API base URL</label>
                 <input type="text" id="socialApiBase" placeholder="https://your-domain.vercel.app">
@@ -980,6 +980,17 @@ tbody tr:last-child td{border-bottom:none;}
                   <input type="text" id="cloudUserUid" readonly style="font-family:'IBM Plex Mono',monospace;font-size:12px;">
                 </div>
                 <button class="btn btn-ghost btn-sm" id="googleSignOutBtnSettings">Sign out</button>
+              </div>
+            </div>
+            <div class="panel" style="max-width:520px;" id="subscriptionPanel">
+              <div class="panel-head"><h3>Subscription</h3></div>
+              <div id="subscriptionSignedOutNote" style="display:none;">
+                <p class="topbar-sub">Sign in with Google to see or manage your subscription.</p>
+              </div>
+              <div id="subscriptionStatusView" style="display:none;">
+                <div class="info-row"><span>Status</span><span id="subscriptionStatusText" style="font-weight:600;">—</span></div>
+                <p class="topbar-sub" style="margin:12px 0;">R1000/month, billed automatically from the card used at signup.</p>
+                <button class="btn btn-primary btn-sm" id="subscribeBtn">Subscribe — R1000/month</button>
               </div>
             </div>
           </div>
@@ -2147,6 +2158,10 @@ function showSignedIn(user){
   if(user.photoURL){ photo.src = user.photoURL; photo.style.display = 'inline-block'; } else { photo.style.display = 'none'; }
   document.getElementById('cloudUserUid').value = user.uid || '';
   updateSidebarStatus();
+
+  document.getElementById('subscriptionSignedOutNote').style.display = 'none';
+  document.getElementById('subscriptionStatusView').style.display = 'block';
+  refreshSubscriptionStatus();
 }
 function showSignedOut(){
   document.getElementById('sidebarSignInBtn').style.display = 'flex';
@@ -2155,7 +2170,58 @@ function showSignedOut(){
   document.getElementById('cloudSignedOutView').style.display = 'block';
   document.getElementById('cloudSignedInView').style.display = 'none';
   updateSidebarStatus();
+
+  document.getElementById('subscriptionSignedOutNote').style.display = 'block';
+  document.getElementById('subscriptionStatusView').style.display = 'none';
 }
+
+const SUBSCRIPTION_LABELS = {
+  active: 'Active',
+  none: 'Not subscribed',
+  payment_failed: 'Payment failed — please update your card',
+  cancelled: 'Cancelled',
+  pending: 'Pending'
+};
+async function refreshSubscriptionStatus(){
+  const textEl = document.getElementById('subscriptionStatusText');
+  const btn = document.getElementById('subscribeBtn');
+  const base = DATA.settings.socialApiBase;
+  if(!cloudUser || !base){
+    textEl.textContent = base ? 'Sign in to check' : 'Backend not configured yet';
+    return;
+  }
+  textEl.textContent = 'Checking…';
+  try{
+    const idToken = await cloudUser.getIdToken();
+    const res = await fetch(`${base}/api/billing-status`, { headers: { Authorization: `Bearer ${idToken}` } });
+    const data = await res.json();
+    const status = data.status || 'none';
+    textEl.textContent = SUBSCRIPTION_LABELS[status] || status;
+    btn.textContent = status === 'active' ? 'Manage subscription' : 'Subscribe — R1000/month';
+  }catch(err){
+    textEl.textContent = 'Could not check status';
+  }
+}
+document.getElementById('subscribeBtn').addEventListener('click', async ()=>{
+  const base = DATA.settings.socialApiBase;
+  if(!cloudUser){ alert('Sign in with Google first.'); return; }
+  if(!base){ alert('Set the API base URL in Social integrations settings first — the billing backend lives at the same address.'); return; }
+  const idToken = await cloudUser.getIdToken();
+  window.location.href = `${base}/api/billing-checkout?idToken=${encodeURIComponent(idToken)}`;
+});
+
+/* If we've just been redirected back from PayFast, show the result */
+(function handleBillingRedirect(){
+  const params = new URLSearchParams(window.location.search);
+  const result = params.get('billing');
+  if(!result) return;
+  if(result === 'success') alert('Payment received — thank you! It may take a few seconds for your subscription status to update.');
+  if(result === 'cancelled') alert('Checkout was cancelled — no payment was made.');
+  params.delete('billing');
+  const newUrl = window.location.pathname + (params.toString() ? '?'+params.toString() : '');
+  window.history.replaceState({}, '', newUrl);
+})();
+
 function pushCloudData(){
   if(!cloudUser || !cloudDb) return;
   cloudDb.collection('flowline_crm_users').doc(cloudUser.uid).set({
@@ -2179,7 +2245,14 @@ function pullCloudData(){
         renderAll();
       }catch(e){ console.error(e); }
     } else {
-      pushCloudData(); // first time this account has signed in — seed the cloud with local data
+      // First time this account has signed in. Deliberately start from a
+      // clean default workspace rather than pushing up whatever happens to
+      // be sitting in this browser's local storage — on a shared or
+      // previously-used device, that could belong to someone else entirely.
+      DATA = defaultData();
+      saveData(DATA);
+      renderAll();
+      pushCloudData();
     }
     if(el) el.textContent = 'Synced to the cloud.';
   }).catch(err=>{
