@@ -50,6 +50,17 @@ module.exports = async (req, res) => {
         pfPaymentId: body.pf_payment_id || null,
         updatedAt: Date.now()
       }, { merge: true });
+
+      // Record this specific payment in history. Keying by pf_payment_id
+      // means if PayFast ever retries the same ITN, we naturally overwrite
+      // the same record instead of double-counting it.
+      const paymentId = body.pf_payment_id || `${uid}-${Date.now()}`;
+      await subRef.collection('payments').doc(paymentId).set({
+        amount: Number(body.amount_gross) || 0,
+        date: Date.now(),
+        pfPaymentId: body.pf_payment_id || null,
+        status: 'complete'
+      }, { merge: true });
     } else if(status === 'FAILED'){
       await subRef.set({ status: 'payment_failed', updatedAt: Date.now() }, { merge: true });
     } else if(status === 'CANCELLED'){

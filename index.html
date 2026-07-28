@@ -550,6 +550,10 @@ tbody tr:last-child td{border-bottom:none;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.2"/><path d="M15.5 10.5v2.3a2.3 2.3 0 004.6 0V12a8.1 8.1 0 10-3.2 6.4"/></svg>
         Social
       </div>
+      <div class="nav-item" data-view="billing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19" stroke-linecap="round"/><path d="M6 15h4" stroke-linecap="round"/></svg>
+        Billing
+      </div>
       <div class="nav-item" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 000-2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 00-1.7-1L15 3h-4l-.4 2.5a7.6 7.6 0 00-1.7 1l-2.3-.9-2 3.4L6.6 11a7.6 7.6 0 000 2l-2 1.5 2 3.4 2.3-.9a7.6 7.6 0 001.7 1L11 21h4l.4-2.5a7.6 7.6 0 001.7-1l2.3.9 2-3.4-2-1.5z"/></svg>
         Settings
@@ -856,6 +860,47 @@ tbody tr:last-child td{border-bottom:none;}
       </div>
     </div>
 
+    <!-- BILLING -->
+    <div class="view" id="view-billing">
+      <div id="billingSignedOutNote" style="display:none;">
+        <div class="empty-state">
+          <h3>Sign in to manage billing</h3>
+          <p>Use "Sign in with Google" in the sidebar to see your subscription and payment history.</p>
+        </div>
+      </div>
+
+      <div id="billingSignedInView" style="display:none;">
+        <div class="panel">
+          <div class="panel-head"><h3>Subscription</h3></div>
+          <div class="info-row"><span>Status</span><span id="billingStatusText" style="font-weight:600;">—</span></div>
+          <div class="info-row" id="billingLastPaymentRow" style="display:none;"><span>Last payment</span><span id="billingLastPaymentText"></span></div>
+          <p class="topbar-sub" style="margin:12px 0;">R1000/month, billed automatically from the card used at signup.</p>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary btn-sm" id="billingSubscribeBtn">Subscribe — R1000/month</button>
+            <button class="btn btn-danger-ghost btn-sm" id="billingCancelBtn" style="display:none;">Cancel subscription</button>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:0;overflow-x:auto;">
+          <div class="panel-head" style="padding:22px 22px 0 22px;"><h3>Payment history</h3></div>
+          <table>
+            <thead><tr><th>Date &amp; time</th><th>Amount</th><th>Reference</th><th></th></tr></thead>
+            <tbody id="billingHistoryTbody"></tbody>
+          </table>
+          <div class="empty-state" id="billingHistoryEmpty" style="display:none;">
+            <h3>No payments yet</h3>
+            <p>Once you subscribe, each payment will show up here.</p>
+          </div>
+        </div>
+
+        <div class="panel" style="border-color:var(--clay-soft);">
+          <div class="panel-head"><h3 style="color:var(--clay);">Danger zone</h3></div>
+          <p class="topbar-sub" style="margin-bottom:14px;">Permanently deletes your account, cancels your subscription first if one is active, and removes all of your CRM data. This can't be undone.</p>
+          <button class="btn btn-danger-ghost btn-sm" id="billingDeleteAccountBtn">Delete my account &amp; all data</button>
+        </div>
+      </div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="view" id="view-settings">
       <div class="settings-layout">
@@ -980,17 +1025,6 @@ tbody tr:last-child td{border-bottom:none;}
                   <input type="text" id="cloudUserUid" readonly style="font-family:'IBM Plex Mono',monospace;font-size:12px;">
                 </div>
                 <button class="btn btn-ghost btn-sm" id="googleSignOutBtnSettings">Sign out</button>
-              </div>
-            </div>
-            <div class="panel" style="max-width:520px;" id="subscriptionPanel">
-              <div class="panel-head"><h3>Subscription</h3></div>
-              <div id="subscriptionSignedOutNote" style="display:none;">
-                <p class="topbar-sub">Sign in with Google to see or manage your subscription.</p>
-              </div>
-              <div id="subscriptionStatusView" style="display:none;">
-                <div class="info-row"><span>Status</span><span id="subscriptionStatusText" style="font-weight:600;">—</span></div>
-                <p class="topbar-sub" style="margin:12px 0;">R1000/month, billed automatically from the card used at signup.</p>
-                <button class="btn btn-primary btn-sm" id="subscribeBtn">Subscribe — R1000/month</button>
               </div>
             </div>
           </div>
@@ -1532,7 +1566,7 @@ document.addEventListener('click', ()=>{
 });
 
 /* ---------- Nav / views ---------- */
-const views = {dashboard:'Dashboard',contacts:'Contacts',deals:'Pipeline',tasks:'Tasks',reports:'Reports',social:'Social',settings:'Settings'};
+const views = {dashboard:'Dashboard',contacts:'Contacts',deals:'Pipeline',tasks:'Tasks',reports:'Reports',social:'Social',billing:'Billing',settings:'Settings'};
 const subs = {
   dashboard:'Your pipeline at a glance',
   contacts:"Everyone you're building a relationship with",
@@ -1540,6 +1574,7 @@ const subs = {
   tasks:'What needs your attention',
   reports:'How the business is trending',
   social:'Followers, engagement, and mentions across your platforms',
+  billing:'Your subscription and payment history',
   settings:'Configure your workspace'
 };
 function showView(name){
@@ -1549,6 +1584,7 @@ function showView(name){
   document.getElementById('topbarSub').textContent = subs[name];
   closeSidebar();
   renderAll();
+  if(name==='billing' && cloudUser) refreshBilling();
 }
 document.querySelectorAll('.nav-item').forEach(el=>{
   el.addEventListener('click',()=>showView(el.dataset.view));
@@ -2159,9 +2195,9 @@ function showSignedIn(user){
   document.getElementById('cloudUserUid').value = user.uid || '';
   updateSidebarStatus();
 
-  document.getElementById('subscriptionSignedOutNote').style.display = 'none';
-  document.getElementById('subscriptionStatusView').style.display = 'block';
-  refreshSubscriptionStatus();
+  document.getElementById('billingSignedOutNote').style.display = 'none';
+  document.getElementById('billingSignedInView').style.display = 'block';
+  refreshBilling();
 }
 function showSignedOut(){
   document.getElementById('sidebarSignInBtn').style.display = 'flex';
@@ -2171,8 +2207,8 @@ function showSignedOut(){
   document.getElementById('cloudSignedInView').style.display = 'none';
   updateSidebarStatus();
 
-  document.getElementById('subscriptionSignedOutNote').style.display = 'block';
-  document.getElementById('subscriptionStatusView').style.display = 'none';
+  document.getElementById('billingSignedOutNote').style.display = 'block';
+  document.getElementById('billingSignedInView').style.display = 'none';
 }
 
 const SUBSCRIPTION_LABELS = {
@@ -2182,10 +2218,20 @@ const SUBSCRIPTION_LABELS = {
   cancelled: 'Cancelled',
   pending: 'Pending'
 };
+
+function billingApiBase(){ return DATA.settings.socialApiBase; }
+
+async function refreshBilling(){
+  await refreshSubscriptionStatus();
+  await refreshPaymentHistory();
+}
+
 async function refreshSubscriptionStatus(){
-  const textEl = document.getElementById('subscriptionStatusText');
-  const btn = document.getElementById('subscribeBtn');
-  const base = DATA.settings.socialApiBase;
+  const textEl = document.getElementById('billingStatusText');
+  const subscribeBtn = document.getElementById('billingSubscribeBtn');
+  const cancelBtn = document.getElementById('billingCancelBtn');
+  const lastPaymentRow = document.getElementById('billingLastPaymentRow');
+  const base = billingApiBase();
   if(!cloudUser || !base){
     textEl.textContent = base ? 'Sign in to check' : 'Backend not configured yet';
     return;
@@ -2197,17 +2243,139 @@ async function refreshSubscriptionStatus(){
     const data = await res.json();
     const status = data.status || 'none';
     textEl.textContent = SUBSCRIPTION_LABELS[status] || status;
-    btn.textContent = status === 'active' ? 'Manage subscription' : 'Subscribe — R1000/month';
+    const isActive = status === 'active';
+    subscribeBtn.style.display = isActive ? 'none' : 'inline-flex';
+    cancelBtn.style.display = isActive ? 'inline-flex' : 'none';
+    if(data.lastPaymentAt){
+      lastPaymentRow.style.display = 'flex';
+      document.getElementById('billingLastPaymentText').textContent = new Date(data.lastPaymentAt).toLocaleString('en-ZA');
+    } else {
+      lastPaymentRow.style.display = 'none';
+    }
   }catch(err){
     textEl.textContent = 'Could not check status';
   }
 }
-document.getElementById('subscribeBtn').addEventListener('click', async ()=>{
-  const base = DATA.settings.socialApiBase;
+
+async function refreshPaymentHistory(){
+  const tbody = document.getElementById('billingHistoryTbody');
+  const emptyEl = document.getElementById('billingHistoryEmpty');
+  const base = billingApiBase();
+  if(!cloudUser || !base){ tbody.innerHTML=''; emptyEl.style.display='block'; return; }
+  try{
+    const idToken = await cloudUser.getIdToken();
+    const res = await fetch(`${base}/api/billing-history`, { headers: { Authorization: `Bearer ${idToken}` } });
+    const data = await res.json();
+    const payments = data.payments || [];
+    emptyEl.style.display = payments.length ? 'none' : 'block';
+    tbody.innerHTML = payments.map(p => `
+      <tr>
+        <td>${new Date(p.date).toLocaleString('en-ZA')}</td>
+        <td class="mono">${fmtMoney(p.amount)}</td>
+        <td class="sub-cell">${escapeHtml(p.pfPaymentId||p.id||'—')}</td>
+        <td><button class="btn btn-ghost btn-sm" data-statement="${p.id}">Download statement</button></td>
+      </tr>`).join('');
+    tbody.querySelectorAll('[data-statement]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const payment = payments.find(p => p.id === btn.dataset.statement);
+        if(payment) downloadStatement(payment);
+      });
+    });
+  }catch(err){
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+  }
+}
+
+function downloadStatement(payment){
+  const date = new Date(payment.date);
+  const monthLabel = date.toLocaleDateString('en-ZA', { month:'long', year:'numeric' });
+  const workspaceName = DATA.settings.workspaceName || 'Alba Business Desk';
+  const accountEmail = cloudUser ? (cloudUser.email||'') : '';
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Statement — ${escapeHtml(monthLabel)}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1D1D1F;max-width:640px;margin:40px auto;padding:0 20px;}
+  h1{font-size:20px;margin-bottom:4px;}
+  .muted{color:#6E6E73;font-size:13px;}
+  table{width:100%;border-collapse:collapse;margin-top:28px;}
+  th,td{text-align:left;padding:10px 0;border-bottom:1px solid #E5E5E7;font-size:14px;}
+  th{color:#6E6E73;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
+  .total{font-size:22px;font-weight:700;margin-top:24px;}
+  .foot{margin-top:40px;font-size:12px;color:#9C9CA1;}
+</style></head>
+<body>
+  <h1>Alba Business Desk</h1>
+  <div class="muted">Statement for ${escapeHtml(monthLabel)}</div>
+  <table>
+    <tr><th>Billed to</th><td>${escapeHtml(accountEmail)}</td></tr>
+    <tr><th>Payment date</th><td>${date.toLocaleString('en-ZA')}</td></tr>
+    <tr><th>Reference</th><td>${escapeHtml(payment.pfPaymentId||payment.id||'—')}</td></tr>
+    <tr><th>Description</th><td>${escapeHtml(workspaceName)} — monthly subscription</td></tr>
+  </table>
+  <div class="total">R ${Number(payment.amount||0).toLocaleString('en-ZA',{minimumFractionDigits:2})}</div>
+  <div class="foot">Generated from ${escapeHtml(workspaceName)} on ${new Date().toLocaleString('en-ZA')}.</div>
+</body></html>`;
+  const blob = new Blob([html], { type:'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `statement-${date.toISOString().slice(0,7)}.html`;
+  a.click();
+}
+
+document.getElementById('billingSubscribeBtn').addEventListener('click', async ()=>{
+  const base = billingApiBase();
   if(!cloudUser){ alert('Sign in with Google first.'); return; }
-  if(!base){ alert('Set the API base URL in Social integrations settings first — the billing backend lives at the same address.'); return; }
+  if(!base){ alert('Set the API base URL in Settings → Social integrations first — the billing backend lives at the same address.'); return; }
   const idToken = await cloudUser.getIdToken();
   window.location.href = `${base}/api/billing-checkout?idToken=${encodeURIComponent(idToken)}`;
+});
+
+document.getElementById('billingCancelBtn').addEventListener('click', async ()=>{
+  const base = billingApiBase();
+  if(!cloudUser || !base) return;
+  if(!confirm('Cancel your subscription? You will not be charged again, and access continues until PayFast confirms the cancellation.')) return;
+  const btn = document.getElementById('billingCancelBtn');
+  btn.disabled = true; btn.textContent = 'Cancelling…';
+  try{
+    const idToken = await cloudUser.getIdToken();
+    const res = await fetch(`${base}/api/billing-cancel`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
+    const data = await res.json();
+    if(!res.ok){ alert(data.error || 'Could not cancel — please try again.'); }
+    else { alert('Subscription cancelled.'); }
+  }catch(err){
+    alert('Could not reach the billing backend.');
+  }
+  btn.disabled = false; btn.textContent = 'Cancel subscription';
+  refreshSubscriptionStatus();
+});
+
+document.getElementById('billingDeleteAccountBtn').addEventListener('click', async ()=>{
+  const base = billingApiBase();
+  if(!cloudUser || !base){ alert('Set the API base URL in Settings → Social integrations first.'); return; }
+  const typed = prompt('This permanently deletes your account, cancels any active subscription first, and removes all your CRM data. This cannot be undone.\n\nType DELETE to confirm.');
+  if(typed !== 'DELETE') return;
+  const btn = document.getElementById('billingDeleteAccountBtn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try{
+    const idToken = await cloudUser.getIdToken();
+    const res = await fetch(`${base}/api/billing-delete-account`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
+    const data = await res.json();
+    if(!res.ok){
+      alert(data.error || 'Could not delete your account — please try again.');
+      btn.disabled = false; btn.textContent = 'Delete my account & all data';
+      return;
+    }
+    alert('Your account and all data have been deleted.');
+    if(cloudAuth) cloudAuth.signOut();
+    localStorage.removeItem(DB_KEY);
+    DATA = defaultData();
+    saveData(DATA);
+    renderAll();
+  }catch(err){
+    alert('Could not reach the billing backend.');
+    btn.disabled = false; btn.textContent = 'Delete my account & all data';
+  }
 });
 
 /* If we've just been redirected back from PayFast, show the result */

@@ -91,9 +91,45 @@ async function isRequestFromPayfast(remoteIp){
   return false;
 }
 
+// Calls PayFast's Subscriptions API to actually cancel the recurring
+// billing agreement — this is what stops future card charges. Distinct
+// from the ITN signature above: the API signs a small set of request
+// headers (merchant-id, passphrase, timestamp, version), not a payment form.
+//
+// Known gotcha worth testing in sandbox before relying on this: PayFast's
+// own API returns a plain 401 "Merchant authorization failed" if this
+// signature is built even slightly wrong, with no more specific detail to
+// debug from — several other integrations have hit exactly this. Test a
+// real cancel against sandbox.payfast.co.za before trusting this in
+// production.
+async function cancelSubscription(token, { merchantId, passphrase }){
+  const timestamp = new Date().toISOString().slice(0,19); // YYYY-MM-DDTHH:MM:SS
+  const version = 'v1';
+  const sigString = `merchant-id=${merchantId}&passphrase=${encodeURIComponent(passphrase||'').replace(/%20/g,'+')}&timestamp=${encodeURIComponent(timestamp)}&version=${version}`;
+  const signature = crypto.createHash('md5').update(sigString).digest('hex');
+
+  const testingParam = process.env.PAYFAST_SANDBOX === 'true' ? '?testing=true' : '';
+  const url = `https://api.payfast.co.za/subscriptions/${encodeURIComponent(token)}/cancel${testingParam}`;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'merchant-id': merchantId,
+      'version': version,
+      'timestamp': timestamp,
+      'signature': signature
+    }
+  });
+  const text = await res.text();
+  let body;
+  try{ body = JSON.parse(text); }catch(e){ body = { raw: text }; }
+  return { ok: res.ok && res.status < 300, status: res.status, body };
+}
+
 module.exports = {
   PAYFAST_PROCESS_URL,
   buildSubscriptionFields,
   validateItn,
-  isRequestFromPayfast
+  isRequestFromPayfast,
+  cancelSubscription
 };

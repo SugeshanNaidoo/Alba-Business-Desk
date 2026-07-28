@@ -42,6 +42,9 @@ service cloud.firestore {
     match /subscriptions/{userId} {
       allow read, write: if false;
     }
+    match /subscriptions/{userId}/payments/{paymentId} {
+      allow read, write: if false;
+    }
 
     // OAuth tokens for connected social accounts: backend-only, always.
     match /social_connections/{platform} {

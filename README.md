@@ -197,12 +197,37 @@ PayFast's page but never fires or never validates the ITN is a customer who
 paid but never gets access, which you want to catch in sandbox, not with a
 real customer's money.
 
+### Cancelling and account deletion
+Both are in the CRM's Billing tab (separate from Settings) now:
+- **Cancel subscription** calls PayFast's Subscriptions API to actually stop
+  the recurring charge — not just a status flag on our side. If PayFast
+  doesn't confirm the cancellation, nothing changes and the failure is
+  shown, rather than silently marking it cancelled while the card keeps
+  being charged.
+- **Delete my account & all data** cancels any active subscription first,
+  and only proceeds to delete the account's CRM data, billing records, and
+  sign-in itself if that cancellation succeeds (or there was nothing to
+  cancel). If cancellation fails, deletion is stopped entirely — better to
+  have a leftover account than to lose the ability to trace an active charge
+  back to anyone.
+- Every completed payment is recorded individually (not just "most recent"),
+  visible as a history list, each with a "Download statement" button that
+  generates a dated statement document naming the account, payment date,
+  reference, and amount.
+
+**Test the cancel flow in sandbox too**, same reasoning as the payment flow
+above — PayFast's Subscriptions API returns a plain 401 "Merchant
+authorization failed" with no further detail if its request signature is
+even slightly off, which several other integrations have run into. Confirm
+a real sandbox subscription can actually be cancelled before relying on this
+for a real customer.
+
 ### What this does NOT do yet
-This section covers taking the payment and tracking who's paid. It does not
-yet **enforce** that only paying accounts can use the CRM — right now,
-subscription status is visible in Settings, but the app itself doesn't lock
-anyone out for not having paid. That's a deliberate next step, not an
-oversight — ask if you want that built next.
+This section covers taking payments, tracking who's paid, cancelling, and
+account deletion. It does not yet **enforce** that only paying accounts can
+use the CRM — subscription status is fully tracked and visible, but the app
+itself doesn't lock anyone out for not having paid. That's a deliberate next
+step, not an oversight — ask if you want that built next.
 
 ## Operational notes
 
