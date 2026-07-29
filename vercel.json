@@ -1,5 +1,5 @@
 {
   "crons": [
-    { "path": "/api/scheduled-sync", "schedule": "0 6 * * *" }
+    { "path": "/api/social-sync?action=scheduled", "schedule": "0 6 * * *" }
   ]
 }

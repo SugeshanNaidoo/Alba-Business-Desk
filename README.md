@@ -17,6 +17,21 @@ in code that runs in a browser — anyone could open dev tools and steal them.
 These functions hold the secrets server-side and only ever return numbers,
 never the keys themselves.
 
+**If you're redeploying over an earlier version of this bundle:** the
+`api/` folder now has only 4 files instead of ~20 — Vercel's free (Hobby)
+plan caps a project at 12 serverless functions total, and the earlier
+one-file-per-operation version blew past that. Everything's been
+consolidated into a handful of router functions instead (`billing.js`,
+`social-sync.js`, `oauth-meta.js`, `oauth-tiktok.js`), each handling several
+related operations via a `?action=` or `?platform=` query parameter. **Delete
+the old individual files** (`instagram-sync.js`, `billing-checkout.js`,
+`oauth-meta-start.js`, etc.) from your Vercel project if they're still
+there from a previous deploy — otherwise you'll have dead code sitting
+around, though it won't break anything since nothing calls those old URLs
+anymore. Shared code that isn't a route (Firebase Admin setup, PayFast
+signing, etc.) now lives in a `lib/` folder instead of `api/`, which is why
+it no longer counts toward the function limit at all.
+
 ---
 
 ## Section A — Real "Connect" buttons + scheduled sync (recommended)
@@ -50,7 +65,8 @@ signed in), this backend needs to read and write Firestore on its own:
 1. developers.facebook.com → My Apps → Create App → "Business".
 2. Add the **Instagram Graph API** and **Facebook Login for Business** products.
 3. Facebook Login for Business → Settings → add this to "Valid OAuth Redirect URIs":
-   `https://your-backend-domain.vercel.app/api/oauth-meta-callback`
+   `https://your-backend-domain.vercel.app/api/oauth-meta`
+   (this one URL handles both starting the connection and the callback)
 4. Because you're only ever connecting your *own* accounts, this can stay in
    the app's Development Mode — just make sure your Meta account is listed
    as an Admin under App Roles → Roles. Full App Review is only needed if
@@ -84,7 +100,8 @@ granted immediately. Video engagement numbers work regardless.
 2. Add the **Login Kit** product, request scopes `user.info.basic`,
    `user.info.stats`, and `video.list`.
 3. Set the redirect URI to:
-   `https://your-backend-domain.vercel.app/api/oauth-tiktok-callback`
+   `https://your-backend-domain.vercel.app/api/oauth-tiktok`
+   (this one URL handles both starting the connection and the callback)
 4. Copy the Client Key and Client Secret into `TIKTOK_CLIENT_KEY` and
    `TIKTOK_CLIENT_SECRET`.
 
@@ -160,13 +177,13 @@ on your side.
 
 ### How it works
 1. A signed-in user clicks "Subscribe" in the CRM → sent to
-   `/api/billing-checkout`, which verifies who they are (their Firebase ID
+   `/api/billing?action=checkout`, which verifies who they are (their Firebase ID
    token) and redirects them into a signed PayFast payment form.
 2. They pay on PayFast's page. PayFast redirects them back to the CRM
    either way (`?billing=success` or `?billing=cancelled`).
 3. Separately — and this is the part that actually matters for security —
    PayFast sends a server-to-server notification (an "ITN") to
-   `/api/billing-notify` confirming the payment. Only after that
+   `/api/billing?action=notify` confirming the payment. Only after that
    notification is validated does the account's subscription get marked
    active in Firestore. The redirect back to the CRM is just for the
    person's benefit; it's never trusted on its own to grant access.
@@ -191,7 +208,7 @@ on your side.
 ### Testing before going live
 Use PayFast's sandbox card numbers (in their docs) with `PAYFAST_SANDBOX=true`
 to run a full subscription through end to end — including waiting to confirm
-the ITN actually lands on `/api/billing-notify` and flips the account to
+the ITN actually lands on `/api/billing?action=notify` and flips the account to
 `active` — before switching to real payments. A payment that "succeeds" on
 PayFast's page but never fires or never validates the ITN is a customer who
 paid but never gets access, which you want to catch in sandbox, not with a
@@ -242,4 +259,4 @@ step, not an oversight — ask if you want that built next.
   option for those.
 - **Multiple Facebook Pages**: the OAuth callback currently connects the
   first Page it finds. If you manage more than one Page, edit
-  `oauth-meta-callback.js` to pick the right one from `pagesData.data`.
+  `oauth-meta.js` (in the callback branch) to pick the right one from `pagesData.data`.

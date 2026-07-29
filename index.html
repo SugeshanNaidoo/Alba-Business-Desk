@@ -2239,7 +2239,7 @@ async function refreshSubscriptionStatus(){
   textEl.textContent = 'Checking…';
   try{
     const idToken = await cloudUser.getIdToken();
-    const res = await fetch(`${base}/api/billing-status`, { headers: { Authorization: `Bearer ${idToken}` } });
+    const res = await fetch(`${base}/api/billing?action=status`, { headers: { Authorization: `Bearer ${idToken}` } });
     const data = await res.json();
     const status = data.status || 'none';
     textEl.textContent = SUBSCRIPTION_LABELS[status] || status;
@@ -2264,7 +2264,7 @@ async function refreshPaymentHistory(){
   if(!cloudUser || !base){ tbody.innerHTML=''; emptyEl.style.display='block'; return; }
   try{
     const idToken = await cloudUser.getIdToken();
-    const res = await fetch(`${base}/api/billing-history`, { headers: { Authorization: `Bearer ${idToken}` } });
+    const res = await fetch(`${base}/api/billing?action=history`, { headers: { Authorization: `Bearer ${idToken}` } });
     const data = await res.json();
     const payments = data.payments || [];
     emptyEl.style.display = payments.length ? 'none' : 'block';
@@ -2328,7 +2328,7 @@ document.getElementById('billingSubscribeBtn').addEventListener('click', async (
   if(!cloudUser){ alert('Sign in with Google first.'); return; }
   if(!base){ alert('Set the API base URL in Settings → Social integrations first — the billing backend lives at the same address.'); return; }
   const idToken = await cloudUser.getIdToken();
-  window.location.href = `${base}/api/billing-checkout?idToken=${encodeURIComponent(idToken)}`;
+  window.location.href = `${base}/api/billing?action=checkout&idToken=${encodeURIComponent(idToken)}`;
 });
 
 document.getElementById('billingCancelBtn').addEventListener('click', async ()=>{
@@ -2339,7 +2339,7 @@ document.getElementById('billingCancelBtn').addEventListener('click', async ()=>
   btn.disabled = true; btn.textContent = 'Cancelling…';
   try{
     const idToken = await cloudUser.getIdToken();
-    const res = await fetch(`${base}/api/billing-cancel`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
+    const res = await fetch(`${base}/api/billing?action=cancel`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
     const data = await res.json();
     if(!res.ok){ alert(data.error || 'Could not cancel — please try again.'); }
     else { alert('Subscription cancelled.'); }
@@ -2359,7 +2359,7 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
   btn.disabled = true; btn.textContent = 'Deleting…';
   try{
     const idToken = await cloudUser.getIdToken();
-    const res = await fetch(`${base}/api/billing-delete-account`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
+    const res = await fetch(`${base}/api/billing?action=delete-account`, { method:'POST', headers:{ Authorization:`Bearer ${idToken}` } });
     const data = await res.json();
     if(!res.ok){
       alert(data.error || 'Could not delete your account — please try again.');
@@ -2515,7 +2515,7 @@ function renderSocialStats(){
   `;
 }
 
-const SYNCABLE_PLATFORMS = { 'Instagram':'instagram-sync', 'Facebook':'facebook-sync', 'TikTok':'tiktok-sync' };
+const SYNCABLE_PLATFORMS = { 'Instagram':'instagram', 'Facebook':'facebook', 'TikTok':'tiktok' };
 function renderPlatforms(){
   const grid = document.getElementById('platformGrid');
   document.getElementById('platformsEmpty').style.display = DATA.socialPlatforms.length ? 'none' : 'block';
@@ -2562,7 +2562,7 @@ async function syncPlatform(platformId){
   const statusEl = document.getElementById(`syncStatus-${platformId}`);
   if(statusEl) statusEl.textContent = 'Syncing…';
   try{
-    const res = await fetch(`${apiBase}/api/${endpoint}`);
+    const res = await fetch(`${apiBase}/api/social-sync?platform=${endpoint}`);
     const data = await res.json();
     if(!res.ok){ throw new Error(data.error || 'Sync failed'); }
 
@@ -3254,12 +3254,12 @@ document.getElementById('saveSocialApiBtn').addEventListener('click',()=>{
 document.getElementById('connectMetaBtn').addEventListener('click', ()=>{
   const base = DATA.settings.socialApiBase, secret = DATA.settings.socialConnectSecret;
   if(!base || !secret){ alert('Set the API base URL and connect secret above first, then save.'); return; }
-  window.location.href = `${base}/api/oauth-meta-start?secret=${encodeURIComponent(secret)}`;
+  window.location.href = `${base}/api/oauth-meta?secret=${encodeURIComponent(secret)}`;
 });
 document.getElementById('connectTiktokBtn').addEventListener('click', ()=>{
   const base = DATA.settings.socialApiBase, secret = DATA.settings.socialConnectSecret;
   if(!base || !secret){ alert('Set the API base URL and connect secret above first, then save.'); return; }
-  window.location.href = `${base}/api/oauth-tiktok-start?secret=${encodeURIComponent(secret)}`;
+  window.location.href = `${base}/api/oauth-tiktok?secret=${encodeURIComponent(secret)}`;
 });
 document.getElementById('refreshConnectionStatusBtn').addEventListener('click', refreshConnectionStatus);
 
@@ -3269,7 +3269,7 @@ async function refreshConnectionStatus(){
   if(!base){ el.innerHTML = '<p class="topbar-sub">Set an API base URL above to check connection status.</p>'; return; }
   el.innerHTML = '<p class="topbar-sub">Checking…</p>';
   try{
-    const res = await fetch(`${base}/api/connection-status`);
+    const res = await fetch(`${base}/api/social-sync?action=status`);
     const data = await res.json();
     const rows = [];
     rows.push(data.meta && data.meta.connected
