@@ -3317,12 +3317,35 @@ document.getElementById('resetDataBtn').addEventListener('click',()=>{
 });
 
 /* JSON import: expects the same shape as our own export */
+/* Validates a file's extension, MIME type (when the browser provides one),
+   and size before we ever try to read its contents — rejects anything that
+   doesn't look like what it claims to be. */
+function validateImportFile(file, { extensions, mimeTypes, maxSizeMB = 15 }){
+  const name = (file.name || '').toLowerCase();
+  const hasValidExtension = extensions.some(ext => name.endsWith(ext));
+  if(!hasValidExtension){
+    return `That file doesn't look like a ${extensions.join(' or ')} file (based on its name). Please choose a ${extensions.join('/')} file.`;
+  }
+  if(file.type && mimeTypes.length && !mimeTypes.includes(file.type)){
+    return `That file's type (${file.type}) doesn't match what was expected. Please choose a genuine ${extensions.join('/')} file.`;
+  }
+  if(file.size > maxSizeMB * 1024 * 1024){
+    return `That file is too large (${(file.size/1024/1024).toFixed(1)}MB) — the limit is ${maxSizeMB}MB.`;
+  }
+  if(file.size === 0){
+    return 'That file is empty.';
+  }
+  return null; // no error — looks good
+}
+
 document.getElementById('importDataBtn').addEventListener('click',()=>{
   document.getElementById('importDataFile').click();
 });
 document.getElementById('importDataFile').addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
+  const validationError = validateImportFile(file, { extensions:['.json'], mimeTypes:['application/json','text/json',''] });
+  if(validationError){ alert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
   reader.onload = evt=>{
     try{
@@ -3340,6 +3363,7 @@ document.getElementById('importDataFile').addEventListener('change', e=>{
     }
     e.target.value = '';
   };
+  reader.onerror = ()=>{ alert('Could not read that file.'); e.target.value=''; };
   reader.readAsText(file);
 });
 
@@ -3385,6 +3409,8 @@ document.getElementById('importContactsCsvBtn').addEventListener('click',()=>{
 document.getElementById('importContactsCsvFile').addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
+  const validationError = validateImportFile(file, { extensions:['.csv'], mimeTypes:['text/csv','application/vnd.ms-excel','text/plain',''] });
+  if(validationError){ alert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
   reader.onload = evt=>{
     const rows = parseCsv(evt.target.result);
@@ -3809,6 +3835,22 @@ function renderAll(){
   renderNotifications();
 }
 renderAll();
+
+/* ---------- Session inactivity timeout ---------- */
+/* If the tab is left open and untouched, make sure the latest work is
+   saved to the cloud and sign out — so a device left unlocked doesn't
+   stay signed into someone's account indefinitely. */
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+let lastActivityAt = Date.now();
+['mousemove','mousedown','keydown','scroll','touchstart'].forEach(evt=>{
+  document.addEventListener(evt, ()=>{ lastActivityAt = Date.now(); }, { passive:true });
+});
+setInterval(()=>{
+  if(!cloudUser) return; // nothing to time out for local-only use
+  if(Date.now() - lastActivityAt < INACTIVITY_LIMIT_MS) return;
+  pushCloudData(); // make sure the latest changes are saved before signing out
+  setTimeout(()=>{ if(cloudAuth) cloudAuth.signOut(); }, 800); // brief pause so the save can land
+}, 60 * 1000); // check once a minute
 </script>
 </body>
 </html>

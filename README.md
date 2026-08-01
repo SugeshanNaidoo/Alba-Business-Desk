@@ -246,6 +246,95 @@ use the CRM — subscription status is fully tracked and visible, but the app
 itself doesn't lock anyone out for not having paid. That's a deliberate next
 step, not an oversight — ask if you want that built next.
 
+## Section D — Security hardening
+
+A batch of security work landed together — here's what each piece actually
+does, and one important env var change.
+
+### ⚠️ One required change: ALLOWED_ORIGIN is no longer optional
+CORS used to fall back to `*` (any site) if `ALLOWED_ORIGIN` wasn't set. It
+no longer does — if `ALLOWED_ORIGIN` (or `CRM_URL`) isn't set to your actual
+CRM's URL, the browser will now refuse to let your own CRM talk to this
+backend. Set `ALLOWED_ORIGIN` to your CRM's exact URL (comma-separate more
+than one if you use a preview and production domain), matching scheme and
+domain exactly — `https://your-crm.vercel.app`, not just `your-crm.vercel.app`.
+
+### OAuth CSRF protection
+Both `oauth-meta.js` and `oauth-tiktok.js` now generate a random `state`
+value on start, store it in a short-lived HttpOnly cookie, and refuse to
+proceed on callback unless the returned `state` matches — this stops
+someone from tricking a browser into "connecting" an account the attacker
+controls. (TikTok's flow was previously generating a state value but never
+actually checking it — that's fixed now, not just added.)
+
+### Rate limiting
+Checkout, cancel, account deletion, the PayFast webhook, both OAuth start
+URLs, and on-demand social sync are all rate-limited per IP address (a
+simple Firestore-backed counter — see `lib/rateLimit.js`). No configuration
+needed. If the rate limiter itself can't be reached, it fails open (allows
+the request) rather than blocking legitimate use during an infrastructure
+hiccup.
+
+### Audit logging
+Sign-ins that lead to checkout, subscription cancellations, payment
+completions/failures, account deletions, rejected webhook attempts, and
+new social connections are all written to a Firestore `audit_logs`
+collection — backend-only, not readable by any client, viewable directly
+in the Firebase console under Firestore Database if you ever need to look
+back at what happened on an account.
+
+### Import file validation
+The CRM's JSON and CSV import now check the file's extension, MIME type
+(when the browser provides one), and size before ever reading its contents
+— rejecting anything that isn't genuinely what it claims to be, rather than
+just trusting the file picker's filter (which is only a UI hint, not
+enforcement).
+
+### Session inactivity timeout
+If the CRM is left open and untouched for 30 minutes while signed in, it
+saves the latest work to the cloud and signs out automatically — so a
+device left unlocked doesn't stay signed into someone's account
+indefinitely. Local-only (not signed in) use isn't affected.
+
+### What's already covered, confirmed again here
+- **Row-level Firestore security** — every collection is either scoped to
+  `request.auth.uid` or fully backend-only; nothing is readable across
+  accounts.
+- **Webhook verification** — PayFast's ITN is signature-checked, source-IP
+  checked, and confirmed via PayFast's own validation endpoint before
+  anything is trusted.
+- **Server-side auth** — every sensitive endpoint verifies a real Firebase
+  ID token server-side; nothing trusts a uid the client just claims.
+
+### What's deliberately NOT in this pass
+Three pieces from the original list are real, substantial architecture
+changes that deserve their own focused pass rather than being rushed in
+alongside everything above:
+
+- **Server-side billing enforcement** (blocking CRM usage entirely for
+  non-paying accounts) — subscription status is fully tracked, but nothing
+  currently stops a signed-in, non-paying account from using the CRM. Doing
+  this properly means deciding what a non-paying signed-in account should
+  see first (nothing? a time-limited trial? read-only?) — a product
+  decision, not just a code change.
+- **Session cookies instead of bearer tokens** — the CRM currently sends a
+  Firebase ID token via `Authorization: Bearer` header (industry-standard,
+  and not vulnerable to classic CSRF the way cookie-based auth is). Moving
+  to HttpOnly session cookies is a real Firebase-supported pattern
+  (`createSessionCookie`), but it also requires adding CSRF tokens to every
+  state-changing request, since cookies — unlike bearer headers — are sent
+  automatically by the browser.
+- **Per-customer social connections** — Instagram/Facebook/TikTok
+  connections are currently one shared connection per platform for the
+  whole deployment (matching the CRM's current one-workspace-per-deployment
+  design). Making each paying customer connect their own accounts is a
+  bigger, related change tied to genuine multi-tenancy.
+- **Cookie consent banner + Privacy Policy** — the mechanism (a banner,
+  storing consent) is straightforward to add, but the actual policy text
+  needs to accurately describe what you collect and comply with POPIA
+  (South Africa's data protection law) — that's worth getting written
+  properly rather than having placeholder legal text quietly shipped.
+
 ## Operational notes
 
 - **Rate limits**: daily sync is comfortably under everyone's limits. Don't

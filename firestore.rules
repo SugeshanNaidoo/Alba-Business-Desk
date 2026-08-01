@@ -3,7 +3,7 @@ rules_version = '2';
 // Firestore security rules for the Alba Business Desk workspace.
 // Deploy via: Firebase console → Firestore Database → Rules, or `firebase deploy --only firestore:rules`
 //
-// Three collections exist:
+// Collections:
 //   /flowline_crm_users/{uid}   — each user's CRM data (contacts, deals, etc.)
 //   /subscriptions/{uid}        — billing status, written ONLY by the backend
 //                                  (via the Admin SDK, which bypasses these
@@ -14,6 +14,8 @@ rules_version = '2';
 //                                  by editing their own document.
 //   /social_connections/{platform} — OAuth tokens for Instagram/Facebook/TikTok,
 //                                  backend-only, never exposed to any client.
+//   /audit_logs/{logId}         — security event trail, backend-only.
+//   /rate_limits/{key}          — rate limiter counters, backend-only.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -48,6 +50,15 @@ service cloud.firestore {
 
     // OAuth tokens for connected social accounts: backend-only, always.
     match /social_connections/{platform} {
+      allow read, write: if false;
+    }
+
+    // Audit trail and rate-limit counters: backend-only, never exposed to
+    // any client, not even for reading your own entries.
+    match /audit_logs/{logId} {
+      allow read, write: if false;
+    }
+    match /rate_limits/{key} {
       allow read, write: if false;
     }
 

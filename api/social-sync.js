@@ -8,6 +8,8 @@ const { setCors } = require('../lib/util');
 const { getConnection } = require('../lib/tokenStore');
 const { getDb } = require('../lib/firebaseAdmin');
 const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformFetchers');
+const { checkRateLimit } = require('../lib/rateLimit');
+const { clientIp } = require('../lib/auditLog');
 
 function uid(prefix){ return prefix + Date.now() + Math.floor(Math.random()*100000); }
 
@@ -41,6 +43,10 @@ function mergePlatformData(crmData, platformName, result){
 
 async function handlePlatformSync(req, res){
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const ip = clientIp(req);
+  if(!(await checkRateLimit(`sync:${ip}`, { limit: 20, windowSeconds: 60 }))){
+    return res.status(429).json({ error: 'Too many sync requests — please wait a minute and try again.' });
+  }
   const fetchers = { instagram: fetchInstagram, facebook: fetchFacebook, tiktok: fetchTikTok };
   const fn = fetchers[req.query.platform];
   if(!fn) return res.status(400).json({ error: 'Unknown platform. Use ?platform=instagram, facebook, or tiktok.' });
@@ -104,7 +110,7 @@ async function handleScheduled(req, res){
 }
 
 module.exports = async (req, res) => {
-  setCors(res);
+  setCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if(req.query.action === 'status') return handleStatus(req, res);
   if(req.query.action === 'scheduled') return handleScheduled(req, res);

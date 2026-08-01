@@ -6,8 +6,11 @@
 // Register THIS url as the app's OAuth redirect URI in Meta's dashboard:
 //   {APP_BASE_URL}/api/oauth-meta
 
-const { setCors } = require('../lib/util');
+const { setCors, parseCookies, setCookie } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
+const { checkRateLimit } = require('../lib/rateLimit');
+const { logEvent, clientIp } = require('../lib/auditLog');
+const crypto = require('crypto');
 
 const GRAPH_VERSION = 'v22.0';
 
@@ -15,6 +18,10 @@ async function handleStart(req, res){
   const { secret } = req.query;
   if(!process.env.CONNECT_SECRET || secret !== process.env.CONNECT_SECRET){
     return res.status(403).send('Invalid or missing connect secret.');
+  }
+  const ip = clientIp(req);
+  if(!(await checkRateLimit(`oauth-meta-start:${ip}`, { limit: 10, windowSeconds: 60 }))){
+    return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   const appId = process.env.META_APP_ID;
   const baseUrl = process.env.APP_BASE_URL;
@@ -26,17 +33,29 @@ async function handleStart(req, res){
     'pages_show_list', 'pages_read_engagement',
     'instagram_basic', 'instagram_manage_insights'
   ].join(',');
-  const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code`;
+  // CSRF protection: a random state tied to a short-lived HttpOnly cookie —
+  // the callback below refuses to proceed unless they match, so a stranger
+  // can't trick your browser into "connecting" an account they control.
+  const state = crypto.randomBytes(16).toString('hex');
+  setCookie(res, 'pf_oauth_state_meta', state, { maxAgeSeconds: 600 });
+  const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${state}`;
   res.writeHead(302, { Location: url });
   res.end();
 }
 
 async function handleCallback(req, res){
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
   const crmUrl = process.env.CRM_URL || '/';
 
   if(error){
     res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_denied` });
+    return res.end();
+  }
+
+  const cookies = parseCookies(req);
+  if(!state || !cookies.pf_oauth_state_meta || state !== cookies.pf_oauth_state_meta){
+    console.error('Meta OAuth state mismatch — possible CSRF attempt or expired flow.');
+    res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_error` });
     return res.end();
   }
 
@@ -77,6 +96,7 @@ async function handleCallback(req, res){
       igUserId, igUsername,
       connectedAt: Date.now()
     });
+    logEvent('meta_connected', { detail: page.name });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_success` });
     res.end();
@@ -88,7 +108,7 @@ async function handleCallback(req, res){
 }
 
 module.exports = async (req, res) => {
-  setCors(res);
+  setCors(req, res);
   if(req.query.code || req.query.error){
     return handleCallback(req, res);
   }
