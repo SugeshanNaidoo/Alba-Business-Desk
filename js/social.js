@@ -334,6 +334,7 @@ function openPlatformModal(id){
 }
 document.getElementById('addPlatformBtn').addEventListener('click', ()=>openPlatformModal(null));
 document.getElementById('savePlatformBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   const name = document.getElementById('pName').value;
   const handle = document.getElementById('pHandle').value.trim();
   const followers = Number(document.getElementById('pFollowers').value)||0;
@@ -347,6 +348,7 @@ document.getElementById('savePlatformBtn').addEventListener('click', ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deletePlatformBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this platform? Its logged posts, mentions, and follower history stay but will show as unlinked.', { title:'Delete platform', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialPlatforms = DATA.socialPlatforms.filter(p=>p.id!==editingPlatformId);
   saveData(DATA); closeModals(); renderAll();
@@ -363,6 +365,7 @@ function openSnapshotModal(platformId){
   document.getElementById('snapshotModalOverlay').classList.add('active');
 }
 document.getElementById('saveSnapshotBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   const p = platformById(snapshotPlatformId);
   if(!p) return;
   const followers = Number(document.getElementById('snapFollowers').value)||0;
@@ -402,6 +405,7 @@ document.getElementById('addPostBtn').addEventListener('click', async ()=>{
   openPostModal(null);
 });
 document.getElementById('savePostBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const platformId = document.getElementById('postPlatform').value;
   if(!platformId){ await showAlert('Add a platform first.'); return; }
   const date = document.getElementById('postDate').value;
@@ -426,6 +430,7 @@ document.getElementById('savePostBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deletePostBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this post?', { title:'Delete post', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialPosts = DATA.socialPosts.filter(p=>p.id!==editingPostId);
   saveData(DATA); closeModals(); renderAll();
@@ -451,6 +456,7 @@ document.getElementById('addMentionBtn').addEventListener('click', async ()=>{
   openMentionModal(null);
 });
 document.getElementById('saveMentionBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const platformId = document.getElementById('mentionPlatform').value;
   const account = document.getElementById('mentionAccount').value.trim();
   if(!platformId || !account){ await showAlert('Please choose a platform and enter the account that mentioned you.'); return; }
@@ -469,6 +475,7 @@ document.getElementById('saveMentionBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deleteMentionBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this mention?', { title:'Delete mention', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialMentions = DATA.socialMentions.filter(m=>m.id!==editingMentionId);
   saveData(DATA); closeModals(); renderAll();

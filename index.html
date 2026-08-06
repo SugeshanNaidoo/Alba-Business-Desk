@@ -16,7 +16,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=1786046855">
 </head>
 <body>
 <div class="login-gate active" id="loginGate">
@@ -560,6 +560,28 @@
               </div>
               <button class="btn btn-ghost btn-sm" id="refreshConnectionStatusBtn" style="margin-top:14px;">Refresh status</button>
             </div>
+
+            <div class="panel" style="max-width:520px;">
+              <div class="panel-head"><h3>WhatsApp</h3></div>
+              <div id="waSignedOutSettingsNote" style="display:none;">
+                <p class="topbar-sub">Sign in with Google to connect WhatsApp.</p>
+              </div>
+              <div id="waSettingsConnectedView" style="display:none;">
+                <div id="waNotConnectedForm">
+                  <p class="topbar-sub" style="margin-bottom:14px;">Paste the credentials from Meta Business Manager (System Users → your app → generate a permanent token with WhatsApp permissions).</p>
+                  <div class="field"><label>Phone Number ID</label><input type="text" id="waPhoneNumberId"></div>
+                  <div class="field"><label>WhatsApp Business Account ID</label><input type="text" id="waWabaId"></div>
+                  <div class="field"><label>Access Token</label><input type="password" id="waAccessToken"></div>
+                  <button class="btn btn-primary btn-sm" id="waConnectBtn">Connect WhatsApp</button>
+                  <p class="topbar-sub" id="waConnectError" style="display:none;color:var(--clay);margin-top:10px;"></p>
+                </div>
+                <div id="waConnectedInfo" style="display:none;">
+                  <div class="info-row"><span>Status</span><span id="waStatusText" style="font-weight:600;color:var(--accent);">Connected</span></div>
+                  <div class="info-row"><span>Number</span><span id="waDisplayNumber">—</span></div>
+                  <button class="btn btn-danger-ghost btn-sm" id="waDisconnectBtn" style="margin-top:10px;">Disconnect</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="settings-section" id="settings-account">
@@ -925,6 +947,25 @@
       <div class="info-row"><span>Phone</span><span id="drawerPhone">—</span></div>
       <div class="info-row"><span>Tag</span><span id="drawerTag">—</span></div>
     </div>
+    <div class="drawer-section" id="drawerWhatsappWrap">
+      <h4>WhatsApp</h4>
+      <div id="waNotConnectedNote" style="display:none;">
+        <p class="topbar-sub">Connect WhatsApp in Settings to chat with contacts here.</p>
+      </div>
+      <div id="waNoPhoneNote" style="display:none;">
+        <p class="topbar-sub">Add a phone number for this contact to chat with them here.</p>
+      </div>
+      <div id="waChatWrap" style="display:none;">
+        <div id="waMessageThread" class="wa-thread"></div>
+        <div id="waWindowClosedNote" class="wa-window-note" style="display:none;">
+          It's been over 24 hours since they last messaged — WhatsApp only allows template messages now, which aren't supported here yet. They'll need to message you again to reopen the chat.
+        </div>
+        <div class="wa-compose" id="waComposeWrap">
+          <input type="text" id="waMessageInput" placeholder="Type a message...">
+          <button class="btn btn-primary btn-sm" id="waSendBtn">Send</button>
+        </div>
+      </div>
+    </div>
     <div class="drawer-section" id="drawerNotesWrap">
       <h4>Notes</h4>
       <div style="font-size:13.5px;line-height:1.6;color:var(--ink);" class="richtext-content" id="drawerNotes"></div>
@@ -949,17 +990,18 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/core.js"></script>
-<script src="js/account.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/contacts.js"></script>
-<script src="js/pipeline.js"></script>
-<script src="js/tasks.js"></script>
-<script src="js/scheduling.js"></script>
-<script src="js/reports.js"></script>
-<script src="js/social.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/init.js"></script>
+<script src="js/assets.js?v=1786046855"></script>
+<script src="js/core.js?v=1786046855"></script>
+<script src="js/account.js?v=1786046855"></script>
+<script src="js/dashboard.js?v=1786046855"></script>
+<script src="js/contacts.js?v=1786046855"></script>
+<script src="js/whatsapp.js?v=1786046855"></script>
+<script src="js/pipeline.js?v=1786046855"></script>
+<script src="js/tasks.js?v=1786046855"></script>
+<script src="js/scheduling.js?v=1786046855"></script>
+<script src="js/reports.js?v=1786046855"></script>
+<script src="js/social.js?v=1786046855"></script>
+<script src="js/settings.js?v=1786046855"></script>
+<script src="js/init.js?v=1786046855"></script>
 </body>
 </html>

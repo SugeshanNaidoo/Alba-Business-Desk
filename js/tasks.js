@@ -40,6 +40,7 @@ function advanceDate(dateStr, recurrence){
 }
 document.addEventListener('change', e=>{
   if(e.target.dataset && e.target.dataset.taskToggle){
+    if(!requireSubscriptionForAction()){ e.target.checked = !e.target.checked; return; }
     const t = DATA.tasks.find(x=>x.id===e.target.dataset.taskToggle);
     if(t){
       t.done = e.target.checked;
@@ -82,6 +83,7 @@ function openTaskModal(id){
 }
 document.getElementById('addTaskBtn').addEventListener('click',()=>openTaskModal(null));
 document.getElementById('saveTaskBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const title = document.getElementById('tTitle').value.trim();
   if(!title){ await showAlert('Please enter a task.'); return; }
   const relVal = document.getElementById('tRelated').value;
@@ -98,6 +100,7 @@ document.getElementById('saveTaskBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deleteTaskBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this task?', { title:'Delete task', confirmLabel:'Delete', danger:true }))) return;
   DATA.tasks = DATA.tasks.filter(t=>t.id!==editingTaskId);
   saveData(DATA); closeModals(); renderAll();

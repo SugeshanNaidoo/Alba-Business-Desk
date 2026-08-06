@@ -21,6 +21,8 @@ rules_version = '2';
 //                                  covers all platform names.
 //   /audit_logs/{logId}         — security event trail, backend-only.
 //   /rate_limits/{key}          — rate limiter counters, backend-only.
+//   /whatsapp_messages/{id}, /whatsapp_message_status/{id},
+//   /whatsapp_phone_lookup/{phoneNumberId} — WhatsApp chat data, backend-only.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -79,6 +81,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /rate_limits/{key} {
+      allow read, write: if false;
+    }
+
+    // WhatsApp chat: message history, delivery status, and the
+    // phone-number-to-account lookup the webhook uses. All backend-only —
+    // the CRM reads messages through the authenticated /api/whatsapp
+    // endpoint, never directly via the client SDK.
+    match /whatsapp_messages/{messageId} {
+      allow read, write: if false;
+    }
+    match /whatsapp_message_status/{statusId} {
+      allow read, write: if false;
+    }
+    match /whatsapp_phone_lookup/{phoneNumberId} {
       allow read, write: if false;
     }
 

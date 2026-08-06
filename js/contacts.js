@@ -118,6 +118,7 @@ function openCompanyModal(id){
 }
 document.getElementById('addCompanyBtn').addEventListener('click',()=>openCompanyModal(null));
 document.getElementById('saveCompanyBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const name = document.getElementById('coName').value.trim();
   if(!name){ await showAlert('Please enter a company name.'); return; }
   const payload = {
@@ -136,6 +137,7 @@ document.getElementById('saveCompanyBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderCompanies(); renderContacts();
 });
 document.getElementById('deleteCompanyBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this company? Linked contacts keep their own record but lose the company link.', { title:'Delete company', confirmLabel:'Delete', danger:true }))) return;
   DATA.companies = DATA.companies.filter(co=>co.id!==editingCompanyId);
   DATA.contacts.forEach(c=>{ if(c.companyId===editingCompanyId) c.companyId=null; });
@@ -189,6 +191,7 @@ function openContactModal(id){
 }
 document.getElementById('addContactBtn').addEventListener('click',()=>openContactModal(null));
 document.getElementById('saveContactBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const name = document.getElementById('cName').value.trim();
   if(!name){ await showAlert('Please enter a name.'); return; }
   const notesHtml = sanitizeHtml(document.getElementById('cNotes').innerHTML);
@@ -212,6 +215,7 @@ document.getElementById('saveContactBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deleteContactBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this contact? Related deals will keep the deal but lose the contact link.', { title:'Delete contact', confirmLabel:'Delete', danger:true }))) return;
   DATA.contacts = DATA.contacts.filter(c=>c.id!==editingContactId);
   saveData(DATA); closeModals(); closeDrawer(); renderAll();
@@ -244,11 +248,13 @@ function openDrawer(contactId){
   `).join('') : '<p class="topbar-sub">No deals yet.</p>';
   renderContactActivityTimeline(contactId);
   document.getElementById('drawerEditBtn').onclick = ()=>{ closeDrawer(); openContactModal(c.id); };
+  initWhatsappPanelForContact(c);
   document.getElementById('contactDrawer').classList.add('active');
   document.getElementById('drawerOverlay').classList.add('active');
 }
 document.getElementById('contactLogAddBtn').addEventListener('click',()=>{
   if(!drawerContactId) return;
+  if(!requireSubscriptionForAction()) return;
   const text = document.getElementById('contactLogText').value.trim();
   if(!text) return;
   const type = document.getElementById('contactLogType').value;
@@ -261,6 +267,7 @@ document.getElementById('contactLogAddBtn').addEventListener('click',()=>{
 function closeDrawer(){
   document.getElementById('contactDrawer').classList.remove('active');
   document.getElementById('drawerOverlay').classList.remove('active');
+  stopWhatsappPolling();
 }
 document.getElementById('drawerClose').addEventListener('click', closeDrawer);
 document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);

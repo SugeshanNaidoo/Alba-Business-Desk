@@ -549,7 +549,7 @@ tbody tr:last-child td{border-bottom:none;}
 .login-gate-card{max-width:360px;text-align:center;}
 .login-gate-card h1{font-size:22px;margin:0 0 8px 0;}
 .login-gate-card p{color:var(--graphite);font-size:14px;margin:0;}
-.login-gate-card .account-signin-btn{width:auto;padding:12px 24px;}
+.login-gate-card .account-signin-btn{width:auto;padding:12px 24px;margin:0 auto;}
 .login-gate-footer{margin-top:28px !important;font-size:12px !important;}
 .login-gate-footer a{color:var(--graphite);}
 .subscribe-banner{
@@ -557,6 +557,17 @@ tbody tr:last-child td{border-bottom:none;}
   background:var(--flow-soft);border-bottom:1px solid var(--line);
   padding:10px 24px;font-size:13px;color:var(--ink);
 }
+.wa-thread{
+  max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+  padding:10px;background:var(--paper);border-radius:10px;margin-bottom:10px;
+}
+.wa-msg{max-width:82%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4;word-break:break-word;}
+.wa-msg-inbound{align-self:flex-start;background:var(--card);border:1px solid var(--line);color:var(--ink);}
+.wa-msg-outbound{align-self:flex-end;background:var(--flow);color:#fff;}
+.wa-msg-time{font-size:10px;opacity:.65;margin-top:3px;display:block;}
+.wa-window-note{font-size:12px;color:var(--clay);background:var(--clay-soft);padding:8px 10px;border-radius:8px;margin-bottom:10px;}
+.wa-compose{display:flex;gap:8px;}
+.wa-compose input{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--card);color:var(--ink);}
 .cookie-banner{
   position:fixed;left:16px;right:16px;bottom:16px;max-width:640px;margin:0 auto;
   background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);

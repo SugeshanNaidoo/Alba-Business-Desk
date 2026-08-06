@@ -49,6 +49,7 @@ function renderBoard(){
       const id = e.dataTransfer.getData('text/plain');
       const deal = dealById(id);
       if(deal && deal.stage !== zone.dataset.drop){
+        if(!requireSubscriptionForAction()) return;
         const newStage = zone.dataset.drop;
         recordStageChange(deal, newStage);
         deal.probability = suggestedProbability(newStage);
@@ -135,6 +136,7 @@ document.getElementById('dStage').addEventListener('change', e=>{
 });
 document.getElementById('dealLogAddBtn').addEventListener('click',()=>{
   if(!editingDealId) return;
+  if(!requireSubscriptionForAction()) return;
   const text = document.getElementById('dealLogText').value.trim();
   if(!text) return;
   const type = document.getElementById('dealLogType').value;
@@ -148,6 +150,7 @@ document.getElementById('dealLogAddBtn').addEventListener('click',()=>{
 });
 document.getElementById('addDealBtn').addEventListener('click',()=>openDealModal(null));
 document.getElementById('saveDealBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const title = document.getElementById('dTitle').value.trim();
   if(!title){ await showAlert('Please enter a deal title.'); return; }
   const newStage = document.getElementById('dStage').value;
@@ -178,6 +181,7 @@ document.getElementById('saveDealBtn').addEventListener('click', async ()=>{
   saveData(DATA); closeModals(); renderAll();
 });
 document.getElementById('deleteDealBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this deal?', { title:'Delete deal', confirmLabel:'Delete', danger:true }))) return;
   DATA.deals = DATA.deals.filter(d=>d.id!==editingDealId);
   saveData(DATA); closeModals(); renderAll();

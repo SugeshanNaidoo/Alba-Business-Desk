@@ -13,6 +13,7 @@ document.querySelectorAll('#settingsSubNav .settings-subnav-item').forEach(item=
 function renderSettings(){
   document.getElementById('settingsWorkspaceName').value = DATA.settings.workspaceName;
   refreshConnectionStatus();
+  refreshWhatsappSettingsStatus();
   renderStatusEditor();
   renderSourceEditor();
   renderCustomFieldEditor('contact');
@@ -28,6 +29,7 @@ function renderSettings(){
     </div>`).join('');
   document.querySelectorAll('[data-stage-index]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(inp.dataset.stageIndex);
       const oldName = DATA.stages[i];
       DATA.deals.forEach(d=>{ if(d.stage===oldName) d.stage = inp.value; });
@@ -37,6 +39,7 @@ function renderSettings(){
   });
   document.querySelectorAll('[data-remove-stage]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(btn.dataset.removeStage);
       if(DATA.stages.length<=1) return;
       DATA.stages.splice(i,1);
@@ -45,6 +48,7 @@ function renderSettings(){
   });
 }
 document.getElementById('addStageBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.stages.push('New stage');
   saveData(DATA); renderSettings(); renderBoard();
 });
@@ -63,6 +67,7 @@ function renderStatusEditor(){
     </div>`).join('');
   document.querySelectorAll('[data-status-name]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(inp.dataset.statusName);
       const oldName = DATA.contactStatuses[i].name;
       DATA.contacts.forEach(c=>{ if(c.tag===oldName) c.tag = inp.value; });
@@ -72,12 +77,14 @@ function renderStatusEditor(){
   });
   document.querySelectorAll('[data-status-category]').forEach(sel=>{
     sel.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       DATA.contactStatuses[Number(sel.dataset.statusCategory)].category = sel.value;
       saveData(DATA); renderAll();
     });
   });
   document.querySelectorAll('[data-remove-status]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       if(DATA.contactStatuses.length<=1) return;
       DATA.contactStatuses.splice(Number(btn.dataset.removeStatus),1);
       saveData(DATA); renderAll();
@@ -85,6 +92,7 @@ function renderStatusEditor(){
   });
 }
 document.getElementById('addStatusBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.contactStatuses.push({id:uid('st'), name:'New status', category:'other'});
   saveData(DATA); renderSettings();
 });
@@ -98,12 +106,14 @@ function renderSourceEditor(){
     </div>`).join('');
   document.querySelectorAll('[data-source-name]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       DATA.leadSources[Number(inp.dataset.sourceName)].name = inp.value;
       saveData(DATA); renderSettings();
     });
   });
   document.querySelectorAll('[data-remove-source]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       if(DATA.leadSources.length<=1) return;
       DATA.leadSources.splice(Number(btn.dataset.removeSource),1);
       saveData(DATA); renderSettings();
@@ -111,6 +121,7 @@ function renderSourceEditor(){
   });
 }
 document.getElementById('addSourceBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.leadSources.push({id:uid('ls'), name:'New source'});
   saveData(DATA); renderSettings();
 });
@@ -124,12 +135,14 @@ function renderTeamMemberEditor(){
     </div>`).join('') || '<p class="topbar-sub" style="margin-bottom:8px;">No team members yet — deals can still be tracked unassigned.</p>';
   document.querySelectorAll('[data-member-name]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       DATA.teamMembers[Number(inp.dataset.memberName)].name = inp.value;
       saveData(DATA); renderSettings();
     });
   });
   document.querySelectorAll('[data-remove-member]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(btn.dataset.removeMember);
       const memberId = DATA.teamMembers[i].id;
       DATA.deals.forEach(d=>{ if(d.assignedTo===memberId) d.assignedTo=null; });
@@ -140,6 +153,7 @@ function renderTeamMemberEditor(){
   });
 }
 document.getElementById('addTeamMemberBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.teamMembers.push({id:uid('tm'), name:'New team member'});
   saveData(DATA); renderSettings();
 });
@@ -153,12 +167,14 @@ function renderLostReasonEditor(){
     </div>`).join('');
   document.querySelectorAll('[data-reason-name]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       DATA.lostReasons[Number(inp.dataset.reasonName)].name = inp.value;
       saveData(DATA); renderSettings();
     });
   });
   document.querySelectorAll('[data-remove-reason]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       if(DATA.lostReasons.length<=1) return;
       const i = Number(btn.dataset.removeReason);
       const reasonId = DATA.lostReasons[i].id;
@@ -169,6 +185,7 @@ function renderLostReasonEditor(){
   });
 }
 document.getElementById('addLostReasonBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.lostReasons.push({id:uid('lr'), name:'New reason'});
   saveData(DATA); renderSettings();
 });
@@ -191,25 +208,27 @@ function renderTargetEditor(){
       <button class="btn btn-ghost btn-sm" data-remove-target="${i}">Remove</button>
     </div>`).join('') || '<p class="topbar-sub" style="margin-bottom:8px;">No targets set yet.</p>';
   document.querySelectorAll('[data-target-member]').forEach(sel=>{
-    sel.addEventListener('change',()=>{ DATA.salesTargets[Number(sel.dataset.targetMember)].memberId = sel.value; saveData(DATA); renderReports(); });
+    sel.addEventListener('change',()=>{ if(!requireSubscriptionForAction()) return; DATA.salesTargets[Number(sel.dataset.targetMember)].memberId = sel.value; saveData(DATA); renderReports(); });
   });
   document.querySelectorAll('[data-target-period]').forEach(sel=>{
-    sel.addEventListener('change',()=>{ DATA.salesTargets[Number(sel.dataset.targetPeriod)].period = sel.value; saveData(DATA); renderReports(); });
+    sel.addEventListener('change',()=>{ if(!requireSubscriptionForAction()) return; DATA.salesTargets[Number(sel.dataset.targetPeriod)].period = sel.value; saveData(DATA); renderReports(); });
   });
   document.querySelectorAll('[data-target-amount]').forEach(inp=>{
-    inp.addEventListener('change',()=>{ DATA.salesTargets[Number(inp.dataset.targetAmount)].amount = Number(inp.value)||0; saveData(DATA); renderReports(); });
+    inp.addEventListener('change',()=>{ if(!requireSubscriptionForAction()) return; DATA.salesTargets[Number(inp.dataset.targetAmount)].amount = Number(inp.value)||0; saveData(DATA); renderReports(); });
   });
   document.querySelectorAll('[data-target-start]').forEach(inp=>{
-    inp.addEventListener('change',()=>{ DATA.salesTargets[Number(inp.dataset.targetStart)].startDate = inp.value; saveData(DATA); renderReports(); });
+    inp.addEventListener('change',()=>{ if(!requireSubscriptionForAction()) return; DATA.salesTargets[Number(inp.dataset.targetStart)].startDate = inp.value; saveData(DATA); renderReports(); });
   });
   document.querySelectorAll('[data-remove-target]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       DATA.salesTargets.splice(Number(btn.dataset.removeTarget),1);
       saveData(DATA); renderSettings(); renderReports();
     });
   });
 }
 document.getElementById('addTargetBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.salesTargets.push({id:uid('tg'), memberId:'team', period:'monthly', amount:0, startDate:new Date().toISOString().slice(0,8)+'01'});
   saveData(DATA); renderSettings();
 });
@@ -233,6 +252,7 @@ function renderCustomFieldEditor(entity){
 
   listEl.querySelectorAll('[data-cf-label]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(inp.dataset.cfLabel.split(':')[1]);
       DATA.customFieldDefs[entity][i].label = inp.value;
       saveData(DATA); renderSettings();
@@ -240,6 +260,7 @@ function renderCustomFieldEditor(entity){
   });
   listEl.querySelectorAll('[data-cf-type]').forEach(sel=>{
     sel.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(sel.dataset.cfType.split(':')[1]);
       DATA.customFieldDefs[entity][i].type = sel.value;
       saveData(DATA); renderSettings();
@@ -247,6 +268,7 @@ function renderCustomFieldEditor(entity){
   });
   listEl.querySelectorAll('[data-cf-options]').forEach(inp=>{
     inp.addEventListener('change',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(inp.dataset.cfOptions.split(':')[1]);
       DATA.customFieldDefs[entity][i].options = inp.value.split(',').map(s=>s.trim()).filter(Boolean);
       saveData(DATA); renderSettings();
@@ -254,6 +276,7 @@ function renderCustomFieldEditor(entity){
   });
   listEl.querySelectorAll('[data-cf-remove]').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if(!requireSubscriptionForAction()) return;
       const i = Number(btn.dataset.cfRemove.split(':')[1]);
       DATA.customFieldDefs[entity].splice(i,1);
       saveData(DATA); renderSettings();
@@ -261,15 +284,18 @@ function renderCustomFieldEditor(entity){
   });
 }
 document.getElementById('addContactFieldBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.customFieldDefs.contact.push({id:uid('cf'), label:'New field', type:'text', options:[]});
   saveData(DATA); renderSettings();
 });
 document.getElementById('addDealFieldBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.customFieldDefs.deal.push({id:uid('cf'), label:'New field', type:'text', options:[]});
   saveData(DATA); renderSettings();
 });
 
 document.getElementById('saveSettingsBtn').addEventListener('click',()=>{
+  if(!requireSubscriptionForAction()) return;
   DATA.settings.workspaceName = document.getElementById('settingsWorkspaceName').value || 'Alba Business Desk';
   saveData(DATA);
   document.title = DATA.settings.workspaceName;
@@ -349,6 +375,7 @@ document.getElementById('exportDataBtn').addEventListener('click',()=>{
   a.click();
 });
 document.getElementById('resetDataBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('This replaces all current data with the sample dataset. Continue?', { title:'Reset to sample data', confirmLabel:'Reset', danger:true }))) return;
   DATA = defaultData();
   saveData(DATA);
@@ -383,6 +410,7 @@ document.getElementById('importDataBtn').addEventListener('click',()=>{
 document.getElementById('importDataFile').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
+  if(!requireSubscriptionForAction()){ e.target.value=''; return; }
   const validationError = validateImportFile(file, { extensions:['.json'], mimeTypes:['application/json','text/json',''] });
   if(validationError){ await showAlert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
@@ -448,6 +476,7 @@ document.getElementById('importContactsCsvBtn').addEventListener('click',()=>{
 document.getElementById('importContactsCsvFile').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
+  if(!requireSubscriptionForAction()){ e.target.value=''; return; }
   const validationError = validateImportFile(file, { extensions:['.csv'], mimeTypes:['text/csv','application/vnd.ms-excel','text/plain',''] });
   if(validationError){ await showAlert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
