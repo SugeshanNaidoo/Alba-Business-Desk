@@ -158,35 +158,60 @@ function downloadStatement(payment){
   const monthLabel = date.toLocaleDateString('en-ZA', { month:'long', year:'numeric' });
   const workspaceName = DATA.settings.workspaceName || 'Alba Business Desk';
   const accountEmail = cloudUser ? (cloudUser.email||'') : '';
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Statement — ${escapeHtml(monthLabel)}</title>
-<style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1D1D1F;max-width:640px;margin:40px auto;padding:0 20px;}
-  h1{font-size:20px;margin-bottom:4px;}
-  .muted{color:#6E6E73;font-size:13px;}
-  table{width:100%;border-collapse:collapse;margin-top:28px;}
-  th,td{text-align:left;padding:10px 0;border-bottom:1px solid #E5E5E7;font-size:14px;}
-  th{color:#6E6E73;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
-  .total{font-size:22px;font-weight:700;margin-top:24px;}
-  .foot{margin-top:40px;font-size:12px;color:#9C9CA1;}
-</style></head>
-<body>
-  <h1>Alba Business Desk</h1>
-  <div class="muted">Statement for ${escapeHtml(monthLabel)}</div>
-  <table>
-    <tr><th>Billed to</th><td>${escapeHtml(accountEmail)}</td></tr>
-    <tr><th>Payment date</th><td>${date.toLocaleString('en-ZA')}</td></tr>
-    <tr><th>Reference</th><td>${escapeHtml(payment.pfPaymentId||payment.id||'—')}</td></tr>
-    <tr><th>Description</th><td>${escapeHtml(workspaceName)} — monthly subscription</td></tr>
-  </table>
-  <div class="total">R ${Number(payment.amount||0).toLocaleString('en-ZA',{minimumFractionDigits:2})}</div>
-  <div class="foot">Generated from ${escapeHtml(workspaceName)} on ${new Date().toLocaleString('en-ZA')}.</div>
-</body></html>`;
-  const blob = new Blob([html], { type:'text/html' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `statement-${date.toISOString().slice(0,7)}.html`;
-  a.click();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const ink = [29,29,31], graphite = [110,110,115], line = [229,229,231];
+
+  // Logo (falls back gracefully to a text wordmark if it can't be embedded)
+  try{
+    const logoW = 42, logoH = logoW * (149/640);
+    doc.addImage(LOGO_BLACK_DATA_URI, 'PNG', margin, 15, logoW, logoH);
+  }catch(e){
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...ink);
+    doc.text(workspaceName, margin, 22);
+  }
+
+  let y = 38;
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...ink);
+  doc.text('Statement', margin, y);
+  y += 7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...graphite);
+  doc.text(monthLabel, margin, y);
+
+  y += 12;
+  doc.setDrawColor(...line);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 10;
+
+  const rows = [
+    ['Billed to', accountEmail || '—'],
+    ['Payment date', date.toLocaleString('en-ZA')],
+    ['Reference', payment.pfPaymentId || payment.id || '—'],
+    ['Description', `${workspaceName} — monthly subscription`]
+  ];
+  rows.forEach(([label, value])=>{
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...graphite);
+    doc.text(label.toUpperCase(), margin, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...ink);
+    doc.text(String(value), margin + 45, y);
+    y += 9;
+  });
+
+  y += 8;
+  doc.setDrawColor(...line);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 14;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(...ink);
+  doc.text(`R ${Number(payment.amount||0).toLocaleString('en-ZA',{minimumFractionDigits:2})}`, margin, y);
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...graphite);
+  doc.text(`Generated from ${workspaceName} on ${new Date().toLocaleString('en-ZA')}.`, margin, doc.internal.pageSize.getHeight() - 15);
+
+  doc.save(`statement-${date.toISOString().slice(0,7)}.pdf`);
 }
 
 document.getElementById('billingSubscribeBtn').addEventListener('click', async ()=>{
