@@ -16,7 +16,7 @@
 // session cookie billing uses) — no shared secret to configure or leak.
 // Only someone actually signed into this CRM can trigger a connection.
 
-const { setCors, parseCookies, setCookie } = require('../lib/util');
+const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
@@ -36,7 +36,7 @@ async function handleStart(req, res){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   const appId = process.env.META_APP_ID;
-  const baseUrl = process.env.APP_BASE_URL;
+  const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
   if(!appId || !baseUrl){
     return res.status(500).send('META_APP_ID and APP_BASE_URL must be set on the server first.');
   }
@@ -71,7 +71,7 @@ async function handleCallback(req, res){
   try{
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const baseUrl = process.env.APP_BASE_URL;
+    const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
     const redirectUri = `${baseUrl}/api/oauth-meta`;
 
     const tokenRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`);

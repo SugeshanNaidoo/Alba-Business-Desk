@@ -9,7 +9,7 @@
 //
 // Set PayFast's notify_url to: {APP_BASE_URL}/api/billing?action=notify
 
-const { setCors } = require('../lib/util');
+const { setCors, normalizeBaseUrl } = require('../lib/util');
 const { verifySession } = require('../lib/session');
 const { getAdmin, getDb } = require('../lib/firebaseAdmin');
 const { buildSubscriptionFields, PAYFAST_PROCESS_URL, validateItn, isRequestFromPayfast, cancelSubscription } = require('../lib/payfast');
@@ -32,7 +32,7 @@ async function handleCheckout(req, res){
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
   const merchantKey = process.env.PAYFAST_MERCHANT_KEY;
   const passphrase = process.env.PAYFAST_PASSPHRASE || '';
-  const appBaseUrl = process.env.APP_BASE_URL;
+  const appBaseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
   const crmUrl = process.env.CRM_URL || '/';
   if(!merchantId || !merchantKey || !appBaseUrl){
     return res.status(500).send('Billing is not configured on this server yet. Set PAYFAST_MERCHANT_ID, PAYFAST_MERCHANT_KEY, and APP_BASE_URL.');

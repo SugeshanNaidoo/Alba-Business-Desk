@@ -13,7 +13,7 @@
 // Register this URL as the OAuth redirect URI in Google Cloud Console:
 //   {APP_BASE_URL}/api/calendar?action=connect
 
-const { setCors, parseCookies, setCookie } = require('../lib/util');
+const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection, getConnection } = require('../lib/tokenStore');
 const { verifySession } = require('../lib/session');
 const { checkRateLimit } = require('../lib/rateLimit');
@@ -31,7 +31,7 @@ async function handleConnectStart(req, res){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
-  const baseUrl = process.env.APP_BASE_URL;
+  const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
   if(!clientId || !baseUrl){
     return res.status(500).send('GOOGLE_CALENDAR_CLIENT_ID and APP_BASE_URL must be set on the server first.');
   }
@@ -69,7 +69,7 @@ async function handleConnectCallback(req, res){
   try{
     const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
-    const baseUrl = process.env.APP_BASE_URL;
+    const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
     const redirectUri = `${baseUrl}/api/calendar?action=connect`;
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

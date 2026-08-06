@@ -4,7 +4,7 @@
 // Register THIS url as TikTok's redirect URI:
 //   {APP_BASE_URL}/api/oauth-tiktok
 
-const { setCors, parseCookies, setCookie } = require('../lib/util');
+const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
@@ -22,7 +22,7 @@ async function handleStart(req, res){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   const clientKey = process.env.TIKTOK_CLIENT_KEY;
-  const baseUrl = process.env.APP_BASE_URL;
+  const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
   if(!clientKey || !baseUrl){
     return res.status(500).send('TIKTOK_CLIENT_KEY and APP_BASE_URL must be set on the server first.');
   }
@@ -55,7 +55,7 @@ async function handleCallback(req, res){
   try{
     const clientKey = process.env.TIKTOK_CLIENT_KEY;
     const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
-    const baseUrl = process.env.APP_BASE_URL;
+    const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
     const redirectUri = `${baseUrl}/api/oauth-tiktok`;
 
     const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {

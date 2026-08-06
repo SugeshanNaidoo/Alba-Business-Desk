@@ -16,7 +16,7 @@
 // login flow, and instagram.com's OAuth endpoint rejects the Facebook
 // App ID with "Invalid platform app" if you try to use that instead.
 
-const { setCors, parseCookies, setCookie } = require('../lib/util');
+const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
@@ -34,11 +34,12 @@ async function handleStart(req, res){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   const appId = process.env.INSTAGRAM_APP_ID;
-  const baseUrl = process.env.APP_BASE_URL;
+  const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
   if(!appId || !baseUrl){
     return res.status(500).send('INSTAGRAM_APP_ID and APP_BASE_URL must be set on the server first.');
   }
   const redirectUri = `${baseUrl}/api/oauth-instagram`;
+  console.log('Instagram OAuth start — redirect_uri:', redirectUri);
   // Just what the sync actually uses — basic profile/media read plus
   // insights. Not requesting content publishing, comment moderation, or
   // messaging, since this integration never does any of those.
@@ -68,8 +69,9 @@ async function handleCallback(req, res){
   try{
     const appId = process.env.INSTAGRAM_APP_ID;
     const appSecret = process.env.INSTAGRAM_APP_SECRET;
-    const baseUrl = process.env.APP_BASE_URL;
+    const baseUrl = normalizeBaseUrl(process.env.APP_BASE_URL);
     const redirectUri = `${baseUrl}/api/oauth-instagram`;
+    console.log('Instagram OAuth callback — redirect_uri:', redirectUri);
 
     // Instagram's token exchange is form-POST, not query-string GET like
     // Facebook's — and the response is wrapped in a `data` array, which is
