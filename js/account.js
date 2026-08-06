@@ -348,6 +348,7 @@ function pullCloudData(){
   });
 }
 function handleAuthChange(user){
+  document.getElementById('authLoadingOverlay').classList.remove('active');
   cloudUser = user || null;
   if(cloudUser){ showSignedIn(cloudUser); pullCloudData(); }
   else { showSignedOut(); }

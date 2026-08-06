@@ -458,6 +458,10 @@ function setTheme(theme){
   if(gateLogo){
     gateLogo.src = theme==='dark' ? LOGO_WHITE_DATA_URI : LOGO_BLACK_DATA_URI;
   }
+  const loadingLogo = document.getElementById('authLoadingLogo');
+  if(loadingLogo){
+    loadingLogo.src = theme==='dark' ? LOGO_WHITE_DATA_URI : LOGO_BLACK_DATA_URI;
+  }
 }
 document.querySelectorAll('.theme-toggle-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>setTheme(btn.dataset.themeChoice));

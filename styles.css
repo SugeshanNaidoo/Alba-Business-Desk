@@ -541,6 +541,22 @@ tbody tr:last-child td{border-bottom:none;}
 }
 .menu-toggle svg{width:18px;height:18px;}
 .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(2px);z-index:55;}
+.auth-loading-overlay{
+  position:fixed;inset:0;background:var(--paper);z-index:250;
+  display:none;align-items:center;justify-content:center;
+}
+.auth-loading-overlay.active{display:flex;}
+.auth-loading-content{text-align:center;}
+.auth-loading-logo{height:34px;width:auto;animation:authLoadingPulse 1.6s ease-in-out infinite;}
+.auth-loading-text{
+  margin:16px 0 0 0;font-size:13px;color:var(--graphite);
+  animation:authLoadingPulse 1.6s ease-in-out infinite;
+  animation-delay:.15s;
+}
+@keyframes authLoadingPulse{
+  0%,100%{opacity:.3;transform:scale(0.97);}
+  50%{opacity:1;transform:scale(1);}
+}
 .login-gate{
   position:fixed;inset:0;background:var(--paper);z-index:200;
   display:none;align-items:center;justify-content:center;padding:20px;

@@ -17,6 +17,18 @@ function renderAll(){
 }
 renderAll();
 
+/* Safety net: handleAuthChange normally hides this within moments of page
+   load. If Firebase somehow never initializes (a load failure, a
+   misconfiguration), fall back to the sign-in screen after a few seconds
+   rather than leaving someone stuck on a blank page forever. */
+setTimeout(()=>{
+  const overlay = document.getElementById('authLoadingOverlay');
+  if(overlay && overlay.classList.contains('active')){
+    overlay.classList.remove('active');
+    if(!cloudUser) document.getElementById('loginGate').classList.add('active');
+  }
+}, 6000);
+
 
 
 /* ---------- Session inactivity timeout ---------- */
