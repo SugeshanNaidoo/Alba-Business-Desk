@@ -118,7 +118,7 @@ async function syncPlatform(platformId){
     const freshStatusEl = document.getElementById(`syncStatus-${platformId}`);
     if(freshStatusEl) freshStatusEl.textContent = `Synced just now — ${newPosts} new post${newPosts===1?'':'s'}.`;
   }catch(err){
-    if(statusEl) statusEl.textContent = 'Sync failed — check your API base URL and backend deployment.';
+    if(statusEl) statusEl.textContent = `Sync failed — ${err.message || 'please try again.'}`;
     console.error(err);
   }
 }

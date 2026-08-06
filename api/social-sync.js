@@ -54,6 +54,7 @@ async function handlePlatformSync(req, res){
     const data = await fn();
     return res.status(200).json(data);
   }catch(err){
+    console.error(`Sync failed for platform=${req.query.platform}:`, err.message, err.stack ? '\n'+err.stack : '');
     return res.status(502).json({ error: err.message });
   }
 }
