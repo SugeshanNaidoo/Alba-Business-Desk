@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Policy — Alba Business Desk</title>
+<script>
+(function(){
+  try{
+    var saved = localStorage.getItem('flowline_theme');
+    var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  }catch(e){}
+})();
+</script>
+<link rel="stylesheet" href="policy.css">
+</head>
+<body>
+  <header class="policy-header">
+    <a href="index.html" class="policy-brand">
+      <img id="policyLogo" class="policy-logo" alt="Alba Business Desk">
+    </a>
+    <div class="policy-header-right">
+      <div class="policy-theme-toggle">
+        <button class="policy-theme-btn" data-theme-choice="light" aria-label="Light mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="policy-theme-btn" data-theme-choice="dark" aria-label="Dark mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.2 14.6A8.6 8.6 0 019.4 3.8a7.1 7.1 0 1010.8 10.8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="policy-wrap">
+    <h1>Cookie Policy</h1>
+    <div class="policy-meta">
+      Last updated: <strong>6 August 2026</strong> · Applies to the Alba Business Desk CRM tool and its website
+    </div>
+
+    <p>
+      Alba Business Desk uses a small number of cookies. None of them are used for advertising, and
+      we do not use third-party tracking or analytics cookies.
+    </p>
+
+    <h2 id="cookies-we-set">1. The cookies we set</h2>
+    <table class="policy-table">
+      <tr><th>Cookie</th><th>Purpose</th><th>Duration</th></tr>
+      <tr><td><code>abd_session</code></td><td>Keeps you signed in to billing and account features. Cannot be read by JavaScript (HttpOnly).</td><td>Up to 5 days, or until you sign out</td></tr>
+      <tr><td><code>abd_csrf</code></td><td>Confirms billing and account requests genuinely came from your own browser session, not a forged request from another site.</td><td>Matches the session cookie</td></tr>
+      <tr><td><code>pf_oauth_state_meta</code></td><td>Prevents forged connection attempts while linking a Facebook account.</td><td>10 minutes, deleted after use</td></tr>
+      <tr><td><code>pf_oauth_state_instagram</code></td><td>Prevents forged connection attempts while linking an Instagram account.</td><td>10 minutes, deleted after use</td></tr>
+      <tr><td><code>pf_oauth_state_tiktok</code></td><td>Prevents forged connection attempts while linking a TikTok account.</td><td>10 minutes, deleted after use</td></tr>
+      <tr><td><code>gcal_oauth_state</code></td><td>Prevents forged connection attempts while linking Google Calendar.</td><td>10 minutes, deleted after use</td></tr>
+    </table>
+    <p>
+      All of these are marked HttpOnly and Secure, so they cannot be read by page scripts or sent
+      over an unencrypted connection.
+    </p>
+
+    <h2 id="local-storage">2. Local storage</h2>
+    <p>
+      We also use your browser's local storage — not a cookie, but similar in effect — for a few
+      things:
+    </p>
+    <ul>
+      <li>Remembering your light/dark theme preference</li>
+      <li>If you're not signed in, keeping your CRM data cached on your own device</li>
+      <li>Remembering that you've seen and accepted this site's cookie notice</li>
+    </ul>
+    <p>
+      None of this data leaves your browser unless you sign in and enable cloud sync.
+    </p>
+
+    <h2 id="third-party">3. Third-party cookies</h2>
+    <p>
+      Connecting a social media account involves Meta or TikTok, connecting a calendar involves
+      Google, and payment involves PayFast; those services may set their own cookies on their own
+      pages, governed by their own policies. We set no advertising or cross-site tracking cookies
+      of our own.
+    </p>
+
+    <h2 id="managing">4. Managing cookies</h2>
+    <p>
+      Every major browser lets you block or delete cookies in its privacy settings. Blocking our
+      session cookies will prevent you from signing in and using billing or account features.
+      Clearing local storage will reset your theme preference and, if you're working offline,
+      remove locally stored CRM data from that device.
+    </p>
+  </main>
+
+  <footer class="policy-footer">
+    Alba Business Desk, a product of Alba Designs ·
+    <a href="privacy-policy.html">Privacy Policy</a> ·
+    <a href="terms-of-service.html">Terms of Service</a> ·
+    <a href="cookie-policy.html">Cookie Policy</a> ·
+    <a href="acceptable-use.html">Acceptable Use</a> ·
+    <a href="disclaimer.html">Disclaimer</a> ·
+    <a href="paia-manual.html">PAIA Manual</a>
+  </footer>
+  <script src="policy.js"></script>
+</body>
+</html>

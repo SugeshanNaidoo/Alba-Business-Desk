@@ -188,9 +188,18 @@ async function handleDeleteAccount(req, res){
     await db.collection('flowline_crm_users').doc(uid).delete().catch(()=>{});
     // Connections are per-customer now — clean up this account's own, not
     // a shared workspace-wide set that belongs to anyone else.
-    for(const platform of ['meta', 'instagram', 'tiktok', 'google_calendar']){
+    const waConn = await db.collection('social_connections').doc(`${uid}_whatsapp`).get();
+    if(waConn.exists && waConn.data().phoneNumberId){
+      await db.collection('whatsapp_phone_lookup').doc(waConn.data().phoneNumberId).delete().catch(()=>{});
+    }
+    for(const platform of ['meta', 'instagram', 'tiktok', 'google_calendar', 'whatsapp']){
       await db.collection('social_connections').doc(`${uid}_${platform}`).delete().catch(()=>{});
     }
+    // WhatsApp chat history — a genuinely separate collection, not covered
+    // by the connection cleanup above, since it's message content, not
+    // connection credentials.
+    await deleteCollection(db, db.collection('whatsapp_messages').where('uid', '==', uid));
+    await deleteCollection(db, db.collection('whatsapp_message_status').where('uid', '==', uid));
     await getAdmin().auth().deleteUser(uid).catch(e => console.error('Could not delete the Firebase Auth user record:', e.message));
 
     return res.status(200).json({ ok: true });
