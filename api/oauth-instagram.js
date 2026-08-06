@@ -9,9 +9,12 @@
 // Facebook Login for Business):
 //   {APP_BASE_URL}/api/oauth-instagram
 //
-// Uses the same META_APP_ID / META_APP_SECRET as the Facebook flow — in
-// Meta's dashboard, Instagram is a separate *product* configured within
-// the same App, not a separate App with its own credentials.
+// Uses its OWN dedicated App ID and Secret — INSTAGRAM_APP_ID and
+// INSTAGRAM_APP_SECRET, NOT META_APP_ID/META_APP_SECRET. This isn't just
+// the Facebook App ID reused: Meta generates a genuinely separate
+// Instagram App ID when you configure the Instagram product for this
+// login flow, and instagram.com's OAuth endpoint rejects the Facebook
+// App ID with "Invalid platform app" if you try to use that instead.
 
 const { setCors, parseCookies, setCookie } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
@@ -30,10 +33,10 @@ async function handleStart(req, res){
   if(!(await checkRateLimit(`oauth-instagram-start:${ip}`, { limit: 10, windowSeconds: 60 }))){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
-  const appId = process.env.META_APP_ID;
+  const appId = process.env.INSTAGRAM_APP_ID;
   const baseUrl = process.env.APP_BASE_URL;
   if(!appId || !baseUrl){
-    return res.status(500).send('META_APP_ID and APP_BASE_URL must be set on the server first.');
+    return res.status(500).send('INSTAGRAM_APP_ID and APP_BASE_URL must be set on the server first.');
   }
   const redirectUri = `${baseUrl}/api/oauth-instagram`;
   // Just what the sync actually uses — basic profile/media read plus
@@ -63,8 +66,8 @@ async function handleCallback(req, res){
   }
 
   try{
-    const appId = process.env.META_APP_ID;
-    const appSecret = process.env.META_APP_SECRET;
+    const appId = process.env.INSTAGRAM_APP_ID;
+    const appSecret = process.env.INSTAGRAM_APP_SECRET;
     const baseUrl = process.env.APP_BASE_URL;
     const redirectUri = `${baseUrl}/api/oauth-instagram`;
 
