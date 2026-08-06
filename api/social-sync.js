@@ -61,14 +61,16 @@ async function handlePlatformSync(req, res){
 async function handleStatus(req, res){
   try{
     const meta = await getConnection('meta').catch(()=>null);
+    const instagram = await getConnection('instagram').catch(()=>null);
     const tiktok = await getConnection('tiktok').catch(()=>null);
     res.status(200).json({
-      meta: meta ? { connected:true, pageName: meta.pageName||'', igUsername: meta.igUsername||'' } : { connected:false },
+      meta: meta ? { connected:true, pageName: meta.pageName||'' } : { connected:false },
+      instagram: instagram ? { connected:true, username: instagram.username||'' } : { connected:false },
       tiktok: tiktok ? { connected:true, displayName: tiktok.displayName||'' } : { connected:false }
     });
   }catch(err){
     res.status(200).json({
-      meta: { connected:false }, tiktok: { connected:false },
+      meta: { connected:false }, instagram: { connected:false }, tiktok: { connected:false },
       note: 'Could not reach Firestore — check FIREBASE_SERVICE_ACCOUNT, or this deployment may be using env-var-only configuration.'
     });
   }

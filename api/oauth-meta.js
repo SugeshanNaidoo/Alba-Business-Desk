@@ -1,10 +1,16 @@
-// Combined start + callback for the Meta (Instagram + Facebook) OAuth flow,
-// kept as one function instead of two to stay within Vercel Hobby's
-// serverless function limit. Same URL serves both roles:
+// Start + callback for the Facebook Page OAuth flow, kept as one function
+// instead of two to stay within Vercel Hobby's serverless function limit.
 //   (no code param)            → redirects into Meta's consent screen (the "start")
 //   ?code=... (or ?error=...) → Meta's redirect back after approval/denial (the "callback")
-// Register THIS url as the app's OAuth redirect URI in Meta's dashboard:
+// Register THIS url as the app's OAuth redirect URI in Meta's dashboard
+// (Facebook Login for Business product settings):
 //   {APP_BASE_URL}/api/oauth-meta
+//
+// Facebook Pages ONLY — Instagram now runs through a completely separate
+// login system (see api/oauth-instagram.js). Meta split these apart:
+// Instagram access via a Facebook Page login (instagram_basic,
+// instagram_manage_insights, etc.) was fully deprecated in January 2025.
+// Trying to request those scopes here now fails with "Invalid Scopes."
 //
 // The "start" step requires a genuine signed-in session (the same HttpOnly
 // session cookie billing uses) — no shared secret to configure or leak.
@@ -35,10 +41,7 @@ async function handleStart(req, res){
     return res.status(500).send('META_APP_ID and APP_BASE_URL must be set on the server first.');
   }
   const redirectUri = `${baseUrl}/api/oauth-meta`;
-  const scope = [
-    'pages_show_list', 'pages_read_engagement',
-    'instagram_basic', 'instagram_manage_insights'
-  ].join(',');
+  const scope = ['pages_show_list', 'pages_read_engagement'].join(',');
   // CSRF protection: a random state tied to a short-lived HttpOnly cookie —
   // the callback below refuses to proceed unless they match, so a stranger
   // can't trick your browser into "connecting" an account they control.
@@ -85,21 +88,10 @@ async function handleCallback(req, res){
     const page = (pagesData.data||[])[0];
     if(!page) throw new Error('No Facebook Page found — make sure you are an admin of a Page.');
 
-    let igUserId = null, igUsername = null;
-    try{
-      const igRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${page.id}?fields=instagram_business_account{id,username}&access_token=${page.access_token}`);
-      const igData = await igRes.json();
-      if(igData.instagram_business_account){
-        igUserId = igData.instagram_business_account.id;
-        igUsername = igData.instagram_business_account.username;
-      }
-    }catch(e){ /* Page has no linked Instagram yet — Facebook sync still works fine */ }
-
     await setConnection('meta', {
       pageAccessToken: page.access_token,
       pageId: page.id,
       pageName: page.name,
-      igUserId, igUsername,
       connectedAt: Date.now()
     });
     await logEvent('meta_connected', { detail: page.name });

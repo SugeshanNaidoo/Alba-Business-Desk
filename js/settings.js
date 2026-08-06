@@ -276,17 +276,16 @@ document.getElementById('saveSettingsBtn').addEventListener('click',()=>{
 });
 
 /* Connect buttons — full-page redirect into each platform's OAuth consent
-   screen. Facebook and Instagram both go through the same Meta login (that's
-   how Meta's platform works — Instagram Business access is granted via the
-   linked Facebook Page's token, not a separate login) but are shown as
-   separate buttons since they're separate platforms to the person clicking.
+   screen. Facebook and Instagram are genuinely separate logins now — Meta
+   retired Instagram-via-Facebook-Login access in January 2025, so each
+   platform has its own connect flow and its own connection record.
    No secret or base URL needed — being signed into the CRM IS the
    authorization now, checked server-side via the session cookie. */
 document.getElementById('connectFacebookBtn').addEventListener('click', ()=>{
   window.location.href = `${BACKEND_BASE}/api/oauth-meta`;
 });
 document.getElementById('connectInstagramBtn').addEventListener('click', ()=>{
-  window.location.href = `${BACKEND_BASE}/api/oauth-meta`;
+  window.location.href = `${BACKEND_BASE}/api/oauth-instagram`;
 });
 document.getElementById('connectTiktokBtn').addEventListener('click', ()=>{
   window.location.href = `${BACKEND_BASE}/api/oauth-tiktok`;
@@ -303,8 +302,8 @@ async function refreshConnectionStatus(){
     rows.push(data.meta && data.meta.connected
       ? `<div class="info-row"><span>Facebook</span><span style="color:var(--accent);">Connected${data.meta.pageName?' — '+escapeHtml(data.meta.pageName):''}</span></div>`
       : `<div class="info-row"><span>Facebook</span><span style="color:var(--graphite);">Not connected</span></div>`);
-    rows.push(data.meta && data.meta.connected && data.meta.igUsername
-      ? `<div class="info-row"><span>Instagram</span><span style="color:var(--accent);">Connected — @${escapeHtml(data.meta.igUsername)}</span></div>`
+    rows.push(data.instagram && data.instagram.connected
+      ? `<div class="info-row"><span>Instagram</span><span style="color:var(--accent);">Connected${data.instagram.username?' — @'+escapeHtml(data.instagram.username):''}</span></div>`
       : `<div class="info-row"><span>Instagram</span><span style="color:var(--graphite);">Not connected</span></div>`);
     rows.push(data.tiktok && data.tiktok.connected
       ? `<div class="info-row"><span>TikTok</span><span style="color:var(--accent);">Connected${data.tiktok.displayName?' — '+escapeHtml(data.tiktok.displayName):''}</span></div>`
@@ -321,9 +320,12 @@ async function refreshConnectionStatus(){
   const result = params.get('social_connect');
   if(!result) return;
   const messages = {
-    meta_success: 'Instagram & Facebook connected successfully.',
-    meta_denied: 'Instagram & Facebook connection was cancelled.',
-    meta_error: 'Something went wrong connecting Instagram & Facebook — check the backend logs.',
+    meta_success: 'Facebook connected successfully.',
+    meta_denied: 'Facebook connection was cancelled.',
+    meta_error: 'Something went wrong connecting Facebook — check the backend logs.',
+    instagram_success: 'Instagram connected successfully.',
+    instagram_denied: 'Instagram connection was cancelled.',
+    instagram_error: 'Something went wrong connecting Instagram — check the backend logs.',
     tiktok_success: 'TikTok connected successfully.',
     tiktok_denied: 'TikTok connection was cancelled.',
     tiktok_error: 'Something went wrong connecting TikTok — check the backend logs.',
