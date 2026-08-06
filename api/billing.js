@@ -27,7 +27,7 @@ async function handleCheckout(req, res){
   let decoded;
   try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).send('You need to be signed in to subscribe. Go back to the CRM, sign in with Google, and try again.'); }
-  logEvent('checkout_started', { uid: decoded.uid, ip });
+  await logEvent('checkout_started', { uid: decoded.uid, ip });
 
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
   const merchantKey = process.env.PAYFAST_MERCHANT_KEY;
@@ -117,21 +117,21 @@ async function handleCancel(req, res){
 
     if(!data || !data.payfastToken || data.status !== 'active'){
       await subRef.set({ status: 'cancelled', updatedAt: Date.now() }, { merge: true });
-      logEvent('subscription_cancelled', { uid: decoded.uid, ip, detail: 'no active subscription found' });
+      await logEvent('subscription_cancelled', { uid: decoded.uid, ip, detail: 'no active subscription found' });
       return res.status(200).json({ ok: true, note: 'No active subscription was found to cancel.' });
     }
 
     const result = await cancelSubscription(data.payfastToken, { merchantId, passphrase });
     if(!result.ok){
       console.error('PayFast cancel failed:', result.status, result.body);
-      logEvent('subscription_cancel_failed', { uid: decoded.uid, ip, detail: JSON.stringify(result.body).slice(0,500) });
+      await logEvent('subscription_cancel_failed', { uid: decoded.uid, ip, detail: JSON.stringify(result.body).slice(0,500) });
       return res.status(502).json({
         error: 'PayFast did not confirm the cancellation. Your subscription has NOT been changed — please try again, or cancel it directly from your PayFast account.',
         detail: result.body
       });
     }
     await subRef.set({ status: 'cancelled', cancelledAt: Date.now(), updatedAt: Date.now() }, { merge: true });
-    logEvent('subscription_cancelled', { uid: decoded.uid, ip });
+    await logEvent('subscription_cancelled', { uid: decoded.uid, ip });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error(err);
@@ -208,13 +208,13 @@ async function handleNotify(req, res){
     const fromPayfast = await isRequestFromPayfast(remoteIp);
     if(!fromPayfast && process.env.PAYFAST_SANDBOX !== 'true'){
       console.error('ITN rejected — request did not come from a recognized PayFast host:', remoteIp);
-      logEvent('itn_rejected_source', { ip: remoteIp, detail: 'not a recognized PayFast host' });
+      await logEvent('itn_rejected_source', { ip: remoteIp, detail: 'not a recognized PayFast host' });
       return res.status(400).send('Invalid source');
     }
     const { valid, reason } = await validateItn(body, passphrase);
     if(!valid){
       console.error('ITN validation failed:', reason);
-      logEvent('itn_rejected_signature', { ip: remoteIp, detail: reason });
+      await logEvent('itn_rejected_signature', { ip: remoteIp, detail: reason });
       return res.status(400).send('Invalid notification');
     }
     const uid = body.m_payment_id;
@@ -238,10 +238,10 @@ async function handleNotify(req, res){
         amount: Number(body.amount_gross) || 0, date: Date.now(),
         pfPaymentId: body.pf_payment_id || null, status: 'complete'
       }, { merge: true });
-      logEvent('payment_completed', { uid, ip: remoteIp, detail: `R${body.amount_gross}` });
+      await logEvent('payment_completed', { uid, ip: remoteIp, detail: `R${body.amount_gross}` });
     } else if(status === 'FAILED'){
       await subRef.set({ status: 'payment_failed', updatedAt: Date.now() }, { merge: true });
-      logEvent('payment_failed', { uid, ip: remoteIp });
+      await logEvent('payment_failed', { uid, ip: remoteIp });
     } else if(status === 'CANCELLED'){
       await subRef.set({ status: 'cancelled', updatedAt: Date.now() }, { merge: true });
     } else {

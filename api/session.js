@@ -35,7 +35,7 @@ async function handleLogin(req, res){
     setCookie(res, SESSION_COOKIE_NAME, sessionCookie, { maxAgeSeconds: SESSION_MAX_AGE_SECONDS, httpOnly: true });
     const csrfToken = crypto.randomBytes(24).toString('hex');
     setCookie(res, CSRF_COOKIE_NAME, csrfToken, { maxAgeSeconds: SESSION_MAX_AGE_SECONDS, httpOnly: false });
-    logEvent('session_login', { uid: decoded.uid, ip });
+    await logEvent('session_login', { uid: decoded.uid, ip });
     return res.status(200).json({ ok: true });
   }catch(e){
     console.error('Could not create session cookie:', e.message);
@@ -52,7 +52,7 @@ async function handleLogout(req, res){
       const decoded = await getAdmin().auth().verifySessionCookie(sessionCookie).catch(()=>null);
       if(decoded){
         await getAdmin().auth().revokeRefreshTokens(decoded.uid).catch(()=>{});
-        logEvent('session_logout', { uid: decoded.uid, ip: clientIp(req) });
+        await logEvent('session_logout', { uid: decoded.uid, ip: clientIp(req) });
       }
     }catch(e){ /* best effort — still clear cookies below either way */ }
   }

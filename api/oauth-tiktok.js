@@ -84,7 +84,7 @@ async function handleCallback(req, res){
       displayName,
       connectedAt: Date.now()
     });
-    logEvent('tiktok_connected', { detail: displayName });
+    await logEvent('tiktok_connected', { detail: displayName });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=tiktok_success` });
     res.end();

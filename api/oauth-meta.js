@@ -102,7 +102,7 @@ async function handleCallback(req, res){
       igUserId, igUsername,
       connectedAt: Date.now()
     });
-    logEvent('meta_connected', { detail: page.name });
+    await logEvent('meta_connected', { detail: page.name });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_success` });
     res.end();

@@ -95,7 +95,7 @@ async function handleConnectCallback(req, res){
       calendarEmail,
       connectedAt: Date.now()
     });
-    logEvent('google_calendar_connected', { detail: calendarEmail });
+    await logEvent('google_calendar_connected', { detail: calendarEmail });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=gcal_success` });
     res.end();
@@ -161,7 +161,7 @@ async function handleCreateEvent(req, res){
       needsMeet: !!needsMeet,
       attendeeEmail: Array.isArray(attendeeEmails) && attendeeEmails[0] ? attendeeEmails[0] : undefined
     });
-    logEvent('calendar_event_created', { detail: summary, ip });
+    await logEvent('calendar_event_created', { detail: summary, ip });
     return res.status(200).json({ ok: true, eventId: result.eventId, meetLink: result.meetLink, htmlLink: result.htmlLink });
   }catch(err){
     console.error('createEvent error:', err.message);
@@ -192,7 +192,7 @@ async function handleUpdateEvent(req, res){
 
   try{
     const result = await updateEvent(eventId, { startISO, endISO, summary, description, attendeeEmails, needsMeet: !!needsMeet });
-    logEvent('calendar_event_updated', { detail: eventId });
+    await logEvent('calendar_event_updated', { detail: eventId });
     return res.status(200).json({ ok: true, meetLink: result.meetLink || null });
   }catch(err){
     console.error('updateEvent error:', err.message);
@@ -211,7 +211,7 @@ async function handleDeleteEvent(req, res){
 
   try{
     await deleteEvent(eventId);
-    logEvent('calendar_event_deleted', { detail: eventId });
+    await logEvent('calendar_event_deleted', { detail: eventId });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error('deleteEvent error:', err.message);
