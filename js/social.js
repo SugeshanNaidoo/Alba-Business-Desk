@@ -78,6 +78,7 @@ async function syncPlatform(platformId){
   if(!p) return;
   const endpoint = SYNCABLE_PLATFORMS[p.name];
   if(!endpoint) return;
+  if(!requireSubscriptionForAction()) return;
   const apiBase = BACKEND_BASE;
   const statusEl = document.getElementById(`syncStatus-${platformId}`);
   if(statusEl) statusEl.textContent = 'Syncing…';

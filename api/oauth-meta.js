@@ -7,29 +7,31 @@
 //   {APP_BASE_URL}/api/oauth-meta
 //
 // Facebook Pages ONLY — Instagram now runs through a completely separate
-// login system (see api/oauth-instagram.js). Meta split these apart:
-// Instagram access via a Facebook Page login (instagram_basic,
-// instagram_manage_insights, etc.) was fully deprecated in January 2025.
-// Trying to request those scopes here now fails with "Invalid Scopes."
+// login system (see api/oauth-instagram.js).
 //
-// The "start" step requires a genuine signed-in session (the same HttpOnly
-// session cookie billing uses) — no shared secret to configure or leak.
-// Only someone actually signed into this CRM can trigger a connection.
+// Every connection belongs to the signed-in account that made it — not
+// shared workspace-wide — and connecting requires an active subscription,
+// same as any other real functionality in the CRM.
 
 const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
+const { isUserSubscribed } = require('../lib/subscriptionCheck');
 const crypto = require('crypto');
 
 const GRAPH_VERSION = 'v22.0';
 
 async function handleStart(req, res){
+  let decoded;
   try{
-    await verifySession(req);
+    decoded = await verifySession(req);
   }catch(err){
     return res.status(err.status||401).send('You need to be signed in to connect a social account. Go back to the CRM, sign in with Google, and try again.');
+  }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).send('An active subscription is needed to connect social accounts. Go back to the CRM and subscribe from the Billing tab first.');
   }
   const ip = clientIp(req);
   if(!(await checkRateLimit(`oauth-meta-start:${ip}`, { limit: 10, windowSeconds: 60 }))){
@@ -68,6 +70,17 @@ async function handleCallback(req, res){
     return res.end();
   }
 
+  // Same browser, same session — the cookie is still present on this
+  // redirect-back request, so we can re-verify who this connection
+  // actually belongs to rather than trusting anything in the query string.
+  let decoded;
+  try{
+    decoded = await verifySession(req);
+  }catch(err){
+    res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_error` });
+    return res.end();
+  }
+
   try{
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
@@ -88,13 +101,13 @@ async function handleCallback(req, res){
     const page = (pagesData.data||[])[0];
     if(!page) throw new Error('No Facebook Page found — make sure you are an admin of a Page.');
 
-    await setConnection('meta', {
+    await setConnection(decoded.uid, 'meta', {
       pageAccessToken: page.access_token,
       pageId: page.id,
       pageName: page.name,
       connectedAt: Date.now()
     });
-    await logEvent('meta_connected', { detail: page.name });
+    await logEvent('meta_connected', { uid: decoded.uid, detail: page.name });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=meta_success` });
     res.end();

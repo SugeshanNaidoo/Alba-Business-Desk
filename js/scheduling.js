@@ -44,6 +44,7 @@ async function refreshGcalStatus(){
   }
 }
 document.getElementById('connectGoogleCalendarBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   window.location.href = `${BACKEND_BASE}/api/calendar?action=connect`;
 });
 
@@ -231,6 +232,7 @@ function openCalendarEventModal(ev, presetDateKey){
 document.getElementById('addCalendarEventBtn').addEventListener('click', ()=>openCalendarEventModal(null));
 
 document.getElementById('saveCalendarEventBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
   const summary = document.getElementById('ceSummary').value.trim();
   const startVal = document.getElementById('ceStart').value;
   const endVal = document.getElementById('ceEnd').value;
@@ -275,6 +277,7 @@ document.getElementById('saveCalendarEventBtn').addEventListener('click', async 
 
 document.getElementById('deleteCalendarEventBtn').addEventListener('click', async ()=>{
   if(!editingCalendarEventId) return;
+  if(!requireSubscriptionForAction()) return;
   if(!(await showConfirm('Delete this event from your Google Calendar? This cannot be undone.', { title:'Delete event', confirmLabel:'Delete', danger:true }))) return;
   try{
     const res = await fetch(`${BACKEND_BASE}/api/calendar?action=delete-event`, {

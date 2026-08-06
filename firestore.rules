@@ -37,9 +37,21 @@ service cloud.firestore {
              && data.updatedAt is number;
     }
 
+    // The real access-control boundary: checked here, not just hidden in
+    // the UI, so it can't be bypassed by editing requests directly. A brand
+    // new account can still CREATE its initial document (so signing in and
+    // exploring the CRM always works, even before subscribing) — it's only
+    // ongoing UPDATEs, the actual saving of changes, that require an active
+    // subscription.
+    function isSubscribed(userId) {
+      return exists(/databases/$(database)/documents/subscriptions/$(userId))
+             && get(/databases/$(database)/documents/subscriptions/$(userId)).data.status == 'active';
+    }
+
     match /flowline_crm_users/{userId} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isWellFormed();
+      allow create: if isOwner(userId) && isWellFormed();
+      allow update: if isOwner(userId) && isWellFormed() && isSubscribed(userId);
       allow delete: if isOwner(userId);
     }
 

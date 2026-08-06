@@ -541,6 +541,22 @@ tbody tr:last-child td{border-bottom:none;}
 }
 .menu-toggle svg{width:18px;height:18px;}
 .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(2px);z-index:55;}
+.login-gate{
+  position:fixed;inset:0;background:var(--paper);z-index:200;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.login-gate.active{display:flex;}
+.login-gate-card{max-width:360px;text-align:center;}
+.login-gate-card h1{font-size:22px;margin:0 0 8px 0;}
+.login-gate-card p{color:var(--graphite);font-size:14px;margin:0;}
+.login-gate-card .account-signin-btn{width:auto;padding:12px 24px;}
+.login-gate-footer{margin-top:28px !important;font-size:12px !important;}
+.login-gate-footer a{color:var(--graphite);}
+.subscribe-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  background:var(--flow-soft);border-bottom:1px solid var(--line);
+  padding:10px 24px;font-size:13px;color:var(--ink);
+}
 .cookie-banner{
   position:fixed;left:16px;right:16px;bottom:16px;max-width:640px;margin:0 auto;
   background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);

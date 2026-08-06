@@ -21,13 +21,18 @@ const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
+const { isUserSubscribed } = require('../lib/subscriptionCheck');
 const crypto = require('crypto');
 
 async function handleStart(req, res){
+  let decoded;
   try{
-    await verifySession(req);
+    decoded = await verifySession(req);
   }catch(err){
     return res.status(err.status||401).send('You need to be signed in to connect a social account. Go back to the CRM, sign in with Google, and try again.');
+  }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).send('An active subscription is needed to connect social accounts. Go back to the CRM and subscribe from the Billing tab first.');
   }
   const ip = clientIp(req);
   if(!(await checkRateLimit(`oauth-instagram-start:${ip}`, { limit: 10, windowSeconds: 60 }))){
@@ -62,6 +67,14 @@ async function handleCallback(req, res){
   const cookies = parseCookies(req);
   if(!state || !cookies.pf_oauth_state_instagram || state !== cookies.pf_oauth_state_instagram){
     console.error('Instagram OAuth state mismatch — possible CSRF attempt or expired flow.');
+    res.writeHead(302, { Location: `${crmUrl}?social_connect=instagram_error` });
+    return res.end();
+  }
+
+  let decoded;
+  try{
+    decoded = await verifySession(req);
+  }catch(err){
     res.writeHead(302, { Location: `${crmUrl}?social_connect=instagram_error` });
     return res.end();
   }
@@ -112,14 +125,14 @@ async function handleCallback(req, res){
       username = prof.username || '';
     }catch(e){ /* cosmetic only */ }
 
-    await setConnection('instagram', {
+    await setConnection(decoded.uid, 'instagram', {
       accessToken,
       igUserId: shortLived.user_id,
       username,
       expiresAt,
       connectedAt: Date.now()
     });
-    await logEvent('instagram_connected', { detail: username });
+    await logEvent('instagram_connected', { uid: decoded.uid, detail: username });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=instagram_success` });
     res.end();

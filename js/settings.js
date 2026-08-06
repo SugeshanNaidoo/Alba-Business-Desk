@@ -282,12 +282,15 @@ document.getElementById('saveSettingsBtn').addEventListener('click',()=>{
    No secret or base URL needed — being signed into the CRM IS the
    authorization now, checked server-side via the session cookie. */
 document.getElementById('connectFacebookBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   window.location.href = `${BACKEND_BASE}/api/oauth-meta`;
 });
 document.getElementById('connectInstagramBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   window.location.href = `${BACKEND_BASE}/api/oauth-instagram`;
 });
 document.getElementById('connectTiktokBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
   window.location.href = `${BACKEND_BASE}/api/oauth-tiktok`;
 });
 document.getElementById('refreshConnectionStatusBtn').addEventListener('click', refreshConnectionStatus);

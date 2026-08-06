@@ -1,7 +1,7 @@
 // Lets the signed-in CRM user view, create, edit, and delete events on
-// their connected Google Calendar, directly from within the CRM. Every
-// action here requires a real signed-in session — there is no public,
-// unauthenticated access to any of this, on purpose.
+// their OWN connected Google Calendar — not a single shared calendar for
+// the whole workspace. Every action requires a real signed-in session,
+// and connecting or making changes requires an active subscription.
 //
 //   ?action=connect        (GET)  → start or complete the Google OAuth connection
 //   ?action=status         (GET)  → is Google Calendar connected (for the UI)
@@ -18,13 +18,18 @@ const { setConnection, getConnection } = require('../lib/tokenStore');
 const { verifySession } = require('../lib/session');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
+const { isUserSubscribed } = require('../lib/subscriptionCheck');
 const { listEvents, createEvent, updateEvent, deleteEvent } = require('../lib/googleCalendar');
 const crypto = require('crypto');
 
 /* ---------- Connect (start + callback combined, like the other OAuth flows) ---------- */
 async function handleConnectStart(req, res){
-  try{ await verifySession(req); }
+  let decoded;
+  try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).send('You need to be signed in to connect Google Calendar. Go back to the CRM, sign in with Google, and try again.'); }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).send('An active subscription is needed to connect Google Calendar. Go back to the CRM and subscribe from the Billing tab first.');
+  }
 
   const ip = clientIp(req);
   if(!(await checkRateLimit(`gcal-connect:${ip}`, { limit: 10, windowSeconds: 60 }))){
@@ -66,6 +71,13 @@ async function handleConnectCallback(req, res){
     return res.end();
   }
 
+  let decoded;
+  try{ decoded = await verifySession(req); }
+  catch(err){
+    res.writeHead(302, { Location: `${crmUrl}?social_connect=gcal_error` });
+    return res.end();
+  }
+
   try{
     const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
@@ -89,13 +101,13 @@ async function handleConnectCallback(req, res){
       calendarEmail = prof.email || '';
     }catch(e){ /* cosmetic only */ }
 
-    await setConnection('google_calendar', {
+    await setConnection(decoded.uid, 'google_calendar', {
       refreshToken: tokenData.refresh_token,
       calendarId: 'primary',
       calendarEmail,
       connectedAt: Date.now()
     });
-    await logEvent('google_calendar_connected', { detail: calendarEmail });
+    await logEvent('google_calendar_connected', { uid: decoded.uid, detail: calendarEmail });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=gcal_success` });
     res.end();
@@ -108,8 +120,11 @@ async function handleConnectCallback(req, res){
 
 /* ---------- Status ---------- */
 async function handleStatus(req, res){
+  let decoded;
+  try{ decoded = await verifySession(req); }
+  catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   try{
-    const conn = await getConnection('google_calendar');
+    const conn = await getConnection(decoded.uid, 'google_calendar');
     return res.status(200).json(conn ? { connected: true, calendarEmail: conn.calendarEmail || '' } : { connected: false });
   }catch(err){
     return res.status(200).json({ connected: false, note: 'Could not reach Firestore.' });
@@ -119,7 +134,8 @@ async function handleStatus(req, res){
 /* ---------- List events ---------- */
 async function handleListEvents(req, res){
   if(req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  try{ await verifySession(req); }
+  let decoded;
+  try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
 
   const timeMin = req.query.timeMin || new Date().toISOString();
@@ -127,7 +143,7 @@ async function handleListEvents(req, res){
   timeMaxDate.setDate(timeMaxDate.getDate() + (Number(req.query.days) || 30));
 
   try{
-    const events = await listEvents(timeMin, timeMaxDate.toISOString(), 100);
+    const events = await listEvents(decoded.uid, timeMin, timeMaxDate.toISOString(), 100);
     return res.status(200).json({ events });
   }catch(err){
     console.error('listEvents error:', err.message);
@@ -139,8 +155,12 @@ async function handleListEvents(req, res){
 /* ---------- Create event ---------- */
 async function handleCreateEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try{ await verifySession(req, { requireCsrf: true }); }
+  let decoded;
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).json({ error: 'An active subscription is needed to create calendar events.' });
+  }
 
   const ip = clientIp(req);
   if(!(await checkRateLimit(`gcal-create:${ip}`, { limit: 30, windowSeconds: 60 }))){
@@ -158,13 +178,13 @@ async function handleCreateEvent(req, res){
     return res.status(400).json({ error: "That time has already passed — you can't create an event in the past." });
   }
   try{
-    const result = await createEvent({
+    const result = await createEvent(decoded.uid, {
       summary, description: description || '',
       startISO: start.toISOString(), endISO: end.toISOString(),
       needsMeet: !!needsMeet,
       attendeeEmail: Array.isArray(attendeeEmails) && attendeeEmails[0] ? attendeeEmails[0] : undefined
     });
-    await logEvent('calendar_event_created', { detail: summary, ip });
+    await logEvent('calendar_event_created', { uid: decoded.uid, detail: summary, ip });
     return res.status(200).json({ ok: true, eventId: result.eventId, meetLink: result.meetLink, htmlLink: result.htmlLink });
   }catch(err){
     console.error('createEvent error:', err.message);
@@ -175,8 +195,12 @@ async function handleCreateEvent(req, res){
 /* ---------- Update event ---------- */
 async function handleUpdateEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try{ await verifySession(req, { requireCsrf: true }); }
+  let decoded;
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).json({ error: 'An active subscription is needed to edit calendar events.' });
+  }
 
   const { eventId, summary, description, startTime, endTime, attendeeEmails, needsMeet } = req.body || {};
   if(!eventId) return res.status(400).json({ error: 'Missing eventId.' });
@@ -194,8 +218,8 @@ async function handleUpdateEvent(req, res){
   }
 
   try{
-    const result = await updateEvent(eventId, { startISO, endISO, summary, description, attendeeEmails, needsMeet: !!needsMeet });
-    await logEvent('calendar_event_updated', { detail: eventId });
+    const result = await updateEvent(decoded.uid, eventId, { startISO, endISO, summary, description, attendeeEmails, needsMeet: !!needsMeet });
+    await logEvent('calendar_event_updated', { uid: decoded.uid, detail: eventId });
     return res.status(200).json({ ok: true, meetLink: result.meetLink || null });
   }catch(err){
     console.error('updateEvent error:', err.message);
@@ -206,15 +230,19 @@ async function handleUpdateEvent(req, res){
 /* ---------- Delete event ---------- */
 async function handleDeleteEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  try{ await verifySession(req, { requireCsrf: true }); }
+  let decoded;
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  if(!(await isUserSubscribed(decoded.uid))){
+    return res.status(402).json({ error: 'An active subscription is needed to delete calendar events.' });
+  }
 
   const { eventId } = req.body || {};
   if(!eventId) return res.status(400).json({ error: 'Missing eventId.' });
 
   try{
-    await deleteEvent(eventId);
-    await logEvent('calendar_event_deleted', { detail: eventId });
+    await deleteEvent(decoded.uid, eventId);
+    await logEvent('calendar_event_deleted', { uid: decoded.uid, detail: eventId });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error('deleteEvent error:', err.message);

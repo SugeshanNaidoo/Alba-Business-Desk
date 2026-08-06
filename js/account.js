@@ -48,6 +48,7 @@ async function establishBackendSession(){
 }
 
 function showSignedIn(user){
+  document.getElementById('loginGate').classList.remove('active');
   document.getElementById('sidebarSignInBtn').style.display = 'none';
   document.getElementById('sidebarAccountChip').style.display = 'flex';
   document.getElementById('sidebarUserName').textContent = user.displayName || user.email || 'Signed in';
@@ -68,6 +69,8 @@ function showSignedIn(user){
   establishBackendSession().then(refreshBilling);
 }
 function showSignedOut(){
+  document.getElementById('loginGate').classList.add('active');
+  subscriptionCheckedOnce = false;
   document.getElementById('sidebarSignInBtn').style.display = 'flex';
   document.getElementById('sidebarAccountChip').style.display = 'none';
 
@@ -94,6 +97,9 @@ async function refreshBilling(){
   await refreshPaymentHistory();
 }
 
+let SUBSCRIPTION_ACTIVE = false;
+let subscriptionCheckedOnce = false;
+
 async function refreshSubscriptionStatus(){
   const textEl = document.getElementById('billingStatusText');
   const subscribeBtn = document.getElementById('billingSubscribeBtn');
@@ -111,6 +117,7 @@ async function refreshSubscriptionStatus(){
     const status = data.status || 'none';
     textEl.textContent = SUBSCRIPTION_LABELS[status] || status;
     const isActive = status === 'active';
+    SUBSCRIPTION_ACTIVE = isActive;
     subscribeBtn.style.display = isActive ? 'none' : 'inline-flex';
     cancelBtn.style.display = isActive ? 'inline-flex' : 'none';
     if(data.lastPaymentAt){
@@ -118,6 +125,14 @@ async function refreshSubscriptionStatus(){
       document.getElementById('billingLastPaymentText').textContent = new Date(data.lastPaymentAt).toLocaleString('en-ZA');
     } else {
       lastPaymentRow.style.display = 'none';
+    }
+    document.getElementById('subscribeBanner').style.display = isActive ? 'none' : 'flex';
+    // First check after signing in: if not subscribed, take them straight
+    // to Billing rather than leaving them to stumble on it — they can
+    // still navigate anywhere else from there, this is a one-time nudge.
+    if(!subscriptionCheckedOnce){
+      subscriptionCheckedOnce = true;
+      if(!isActive) showView('billing');
     }
   }catch(err){
     textEl.textContent = 'Could not check status';
@@ -285,6 +300,7 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
   window.history.replaceState({}, '', newUrl);
 })();
 
+let hasWarnedAboutBlockedSave = false;
 function pushCloudData(){
   if(!cloudUser || !cloudDb) return;
   cloudDb.collection('flowline_crm_users').doc(cloudUser.uid).set({
@@ -295,6 +311,14 @@ function pushCloudData(){
   }).catch(err=>{
     console.error(err);
     const el = document.getElementById('cloudSyncStatus');
+    if(err && err.code === 'permission-denied'){
+      if(el) el.textContent = 'Changes are not being saved — subscribe to keep them.';
+      if(!SUBSCRIPTION_ACTIVE && !hasWarnedAboutBlockedSave){
+        hasWarnedAboutBlockedSave = true;
+        showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to save your changes.", { title:'Subscription needed' });
+      }
+      return;
+    }
     if(el) el.textContent = 'Cloud sync failed — your changes are still saved on this device.';
   });
 }
@@ -357,6 +381,8 @@ async function endBackendSession(){
   }catch(err){ /* best effort — client-side sign-out still proceeds */ }
 }
 document.getElementById('sidebarSignInBtn').addEventListener('click', requestGoogleSignIn);
+document.getElementById('loginGateSignInBtn').addEventListener('click', requestGoogleSignIn);
+document.getElementById('subscribeBannerBtn').addEventListener('click', ()=>showView('billing'));
 document.getElementById('sidebarSignOutBtn').addEventListener('click',()=>{
   endBackendSession();
   if(cloudAuth) cloudAuth.signOut();

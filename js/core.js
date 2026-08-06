@@ -74,6 +74,19 @@ function showPrompt(message, { title = 'Input needed', defaultValue = '', confir
 document.getElementById('dialogOverlay').addEventListener('click', e=>{
   if(e.target.id === 'dialogOverlay') _closeDialog(false);
 });
+
+/* ---------- Subscription gate (client-side pre-check) ---------- */
+/* SUBSCRIPTION_ACTIVE is set by account.js once the real status is known.
+   This is purely a friendlier UX layer — every action it guards is ALSO
+   enforced server-side (Firestore rules for saving data, subscription
+   checks in the backend for connecting platforms and calendar actions),
+   so this check being skipped or bypassed never grants real access. */
+function requireSubscriptionForAction(){
+  if(typeof SUBSCRIPTION_ACTIVE !== 'undefined' && SUBSCRIPTION_ACTIVE) return true;
+  showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to use this.", { title:'Subscription needed' });
+  return false;
+}
+
 let firebaseApp = null, cloudAuth = null, cloudDb = null, cloudUser = null, cloudSaveTimer = null;
 const STAGE_COLORS = ['stage-lead','stage-mid','stage-mid','stage-mid','stage-won','stage-lost'];
 
@@ -440,6 +453,10 @@ function setTheme(theme){
       logo.style.opacity = '0';
       setTimeout(()=>{ logo.src = nextSrc; logo.style.opacity = '1'; }, 150);
     }
+  }
+  const gateLogo = document.getElementById('loginGateLogo');
+  if(gateLogo){
+    gateLogo.src = theme==='dark' ? LOGO_WHITE_DATA_URI : LOGO_BLACK_DATA_URI;
   }
 }
 document.querySelectorAll('.theme-toggle-btn').forEach(btn=>{

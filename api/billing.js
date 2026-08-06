@@ -186,6 +186,11 @@ async function handleDeleteAccount(req, res){
     await deleteCollection(db, subRef.collection('payments'));
     await subRef.delete().catch(()=>{});
     await db.collection('flowline_crm_users').doc(uid).delete().catch(()=>{});
+    // Connections are per-customer now — clean up this account's own, not
+    // a shared workspace-wide set that belongs to anyone else.
+    for(const platform of ['meta', 'instagram', 'tiktok', 'google_calendar']){
+      await db.collection('social_connections').doc(`${uid}_${platform}`).delete().catch(()=>{});
+    }
     await getAdmin().auth().deleteUser(uid).catch(e => console.error('Could not delete the Firebase Auth user record:', e.message));
 
     return res.status(200).json({ ok: true });
