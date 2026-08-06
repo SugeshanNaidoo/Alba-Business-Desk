@@ -10,6 +10,7 @@ const { getDb } = require('../lib/firebaseAdmin');
 const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformFetchers');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { clientIp } = require('../lib/auditLog');
+const { verifySession } = require('../lib/session');
 
 function uid(prefix){ return prefix + Date.now() + Math.floor(Math.random()*100000); }
 
@@ -43,6 +44,8 @@ function mergePlatformData(crmData, platformName, result){
 
 async function handlePlatformSync(req, res){
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  try{ await verifySession(req); }
+  catch(err){ return res.status(err.status||401).json({ error: 'You need to be signed in to sync social data.' }); }
   const ip = clientIp(req);
   if(!(await checkRateLimit(`sync:${ip}`, { limit: 20, windowSeconds: 60 }))){
     return res.status(429).json({ error: 'Too many sync requests — please wait a minute and try again.' });

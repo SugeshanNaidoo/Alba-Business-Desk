@@ -82,7 +82,7 @@ async function syncPlatform(platformId){
   const statusEl = document.getElementById(`syncStatus-${platformId}`);
   if(statusEl) statusEl.textContent = 'Syncing…';
   try{
-    const res = await fetch(`${apiBase}/api/social-sync?platform=${endpoint}`);
+    const res = await fetch(`${apiBase}/api/social-sync?platform=${endpoint}`, { credentials:'include' });
     const data = await res.json();
     if(!res.ok){ throw new Error(data.error || 'Sync failed'); }
 

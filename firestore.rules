@@ -12,8 +12,13 @@ rules_version = '2';
 //                                  owner, can write here — that would let
 //                                  someone grant themselves a free subscription
 //                                  by editing their own document.
-//   /social_connections/{platform} — OAuth tokens for Instagram/Facebook/TikTok,
-//                                  backend-only, never exposed to any client.
+//   /subscriptions/{uid}/payments/{paymentId} — individual payment history
+//                                  records, same backend-only reasoning.
+//   /social_connections/{platform} — OAuth tokens for every connected
+//                                  platform (meta, instagram, tiktok,
+//                                  google_calendar) — backend-only, never
+//                                  exposed to any client. One wildcard rule
+//                                  covers all platform names.
 //   /audit_logs/{logId}         — security event trail, backend-only.
 //   /rate_limits/{key}          — rate limiter counters, backend-only.
 
@@ -39,8 +44,8 @@ service cloud.firestore {
     }
 
     // Billing status: no client access at all, in either direction. The
-    // backend's /api/billing-status endpoint reads this via the Admin SDK
-    // (which isn't subject to these rules) after verifying who's asking.
+    // backend's /api/billing endpoints read this via the Admin SDK (which
+    // isn't subject to these rules) after verifying who's asking.
     match /subscriptions/{userId} {
       allow read, write: if false;
     }
@@ -48,7 +53,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // OAuth tokens for connected social accounts: backend-only, always.
+    // OAuth tokens for connected platforms (Facebook, Instagram, TikTok,
+    // Google Calendar): backend-only, always. {platform} is a wildcard —
+    // this one rule covers every platform name without needing its own
+    // entry per platform.
     match /social_connections/{platform} {
       allow read, write: if false;
     }
