@@ -1,17 +1,21 @@
 // Combined start + callback for the TikTok OAuth flow — same reasoning as
-// oauth-meta.js. Register THIS url as TikTok's redirect URI:
+// oauth-meta.js, including requiring a real signed-in session rather than
+// a shared secret to start a connection.
+// Register THIS url as TikTok's redirect URI:
 //   {APP_BASE_URL}/api/oauth-tiktok
 
 const { setCors, parseCookies, setCookie } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
+const { verifySession } = require('../lib/session');
 const crypto = require('crypto');
 
 async function handleStart(req, res){
-  const { secret } = req.query;
-  if(!process.env.CONNECT_SECRET || secret !== process.env.CONNECT_SECRET){
-    return res.status(403).send('Invalid or missing connect secret.');
+  try{
+    await verifySession(req);
+  }catch(err){
+    return res.status(err.status||401).send('You need to be signed in to connect a social account. Go back to the CRM, sign in with Google, and try again.');
   }
   const ip = clientIp(req);
   if(!(await checkRateLimit(`oauth-tiktok-start:${ip}`, { limit: 10, windowSeconds: 60 }))){

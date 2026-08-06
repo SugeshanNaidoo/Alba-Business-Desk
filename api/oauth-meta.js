@@ -1,23 +1,29 @@
 // Combined start + callback for the Meta (Instagram + Facebook) OAuth flow,
 // kept as one function instead of two to stay within Vercel Hobby's
 // serverless function limit. Same URL serves both roles:
-//   ?secret=...        → redirects into Meta's consent screen (the "start")
+//   (no code param)            → redirects into Meta's consent screen (the "start")
 //   ?code=... (or ?error=...) → Meta's redirect back after approval/denial (the "callback")
 // Register THIS url as the app's OAuth redirect URI in Meta's dashboard:
 //   {APP_BASE_URL}/api/oauth-meta
+//
+// The "start" step requires a genuine signed-in session (the same HttpOnly
+// session cookie billing uses) — no shared secret to configure or leak.
+// Only someone actually signed into this CRM can trigger a connection.
 
 const { setCors, parseCookies, setCookie } = require('../lib/util');
 const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
+const { verifySession } = require('../lib/session');
 const crypto = require('crypto');
 
 const GRAPH_VERSION = 'v22.0';
 
 async function handleStart(req, res){
-  const { secret } = req.query;
-  if(!process.env.CONNECT_SECRET || secret !== process.env.CONNECT_SECRET){
-    return res.status(403).send('Invalid or missing connect secret.');
+  try{
+    await verifySession(req);
+  }catch(err){
+    return res.status(err.status||401).send('You need to be signed in to connect a social account. Go back to the CRM, sign in with Google, and try again.');
   }
   const ip = clientIp(req);
   if(!(await checkRateLimit(`oauth-meta-start:${ip}`, { limit: 10, windowSeconds: 60 }))){

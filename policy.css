@@ -1,0 +1,225 @@
+/* Shared styling for Alba Business Desk's policy documents (Privacy Policy,
+   Terms of Service, and any future ones). Deliberately uses the same design
+   tokens and theme system as the app itself (index.html / styles.css) —
+   same fonts, same color roles, same light/dark variables, same localStorage
+   key for theme — so these pages feel like part of the same product and a
+   theme choice made on one carries over to the other. */
+
+:root{
+  --ink:#1D1D1F;
+  --ink-soft:#2C2C2E;
+  --paper:#EEEEF0;
+  --card:#FFFFFF;
+  --line:rgba(0,0,0,0.1);
+  --graphite:#6E6E73;
+  --graphite-soft:#9C9CA1;
+  --accent:#1E8E3E;
+  --accent-soft:#E3F5E7;
+  --flow:#0071E3;
+  --flow-soft:#E8F1FD;
+  --clay:#D93025;
+  --clay-soft:#FBE8E6;
+  --radius:16px;
+  --shadow:0 1px 2px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08);
+  --shadow-lg:0 24px 70px rgba(0,0,0,0.22);
+  --header-glass:rgba(238,238,240,0.8);
+  --control-track:rgba(0,0,0,0.055);
+  --active-surface:#FFFFFF;
+}
+html[data-theme="dark"]{
+  --ink:#F2F2F3;
+  --ink-soft:#E5E5E7;
+  --paper:#101012;
+  --card:#1C1C1F;
+  --line:rgba(255,255,255,0.09);
+  --graphite:#9A9AA0;
+  --graphite-soft:#6E6E73;
+  --accent:#30D158;
+  --accent-soft:rgba(48,209,88,0.16);
+  --flow:#0A84FF;
+  --flow-soft:rgba(10,132,255,0.18);
+  --clay:#FF453A;
+  --clay-soft:rgba(255,69,58,0.16);
+  --shadow:0 1px 2px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.5);
+  --shadow-lg:0 24px 70px rgba(0,0,0,0.65);
+  --header-glass:rgba(16,16,18,0.8);
+  --control-track:rgba(255,255,255,0.08);
+  --active-surface:#2C2C30;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  transition:background-color .25s ease, color .25s ease;
+}
+*, *::before, *::after{
+  transition: background-color .25s ease, color .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.policy-header{
+  background:var(--header-glass);
+  backdrop-filter:blur(20px) saturate(1.8);
+  -webkit-backdrop-filter:blur(20px) saturate(1.8);
+  border-bottom:1px solid var(--line);
+  padding:16px 28px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:5;
+}
+.policy-brand{
+  display:flex;
+  align-items:center;
+  text-decoration:none;
+}
+.policy-logo{
+  height:30px;
+  width:auto;
+  display:block;
+}
+.policy-header-right{display:flex;align-items:center;gap:20px;}
+.policy-nav{display:flex;gap:20px;}
+.policy-nav a{
+  color:var(--graphite);
+  text-decoration:none;
+  font-size:13.5px;
+  font-weight:500;
+}
+.policy-nav a:hover, .policy-nav a.active{color:var(--flow);}
+
+.policy-theme-toggle{display:flex;gap:2px;background:var(--control-track);padding:3px;border-radius:999px;}
+.policy-theme-btn{
+  display:flex;align-items:center;justify-content:center;padding:6px 9px;border:none;background:transparent;
+  border-radius:999px;cursor:pointer;color:var(--graphite);transition:background .15s,color .15s;
+}
+.policy-theme-btn svg{width:14px;height:14px;}
+.policy-theme-btn.active{background:var(--active-surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+
+.policy-wrap{
+  max-width:760px;
+  margin:0 auto;
+  padding:56px 24px 100px 24px;
+}
+.policy-wrap h1{
+  font-size:34px;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  margin:0 0 8px 0;
+}
+.policy-meta{
+  color:var(--graphite);
+  font-size:13.5px;
+  margin-bottom:36px;
+  padding-bottom:24px;
+  border-bottom:1px solid var(--line);
+}
+.policy-wrap h2{
+  font-size:20px;
+  font-weight:700;
+  margin:40px 0 14px 0;
+  letter-spacing:-0.01em;
+}
+.policy-wrap h3{
+  font-size:15.5px;
+  font-weight:700;
+  margin:22px 0 10px 0;
+}
+.policy-wrap p{
+  margin:0 0 14px 0;
+  font-size:14.5px;
+  color:var(--graphite);
+}
+.policy-wrap ul, .policy-wrap ol{
+  margin:0 0 14px 0;
+  padding-left:22px;
+  font-size:14.5px;
+  color:var(--graphite);
+}
+.policy-wrap li{margin-bottom:6px;}
+.policy-wrap a{color:var(--flow);}
+.policy-wrap strong{color:var(--ink);}
+.policy-wrap code{
+  background:var(--paper);border:1px solid var(--line);border-radius:5px;
+  padding:1px 6px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink);
+}
+
+.policy-callout{
+  background:var(--flow-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:16px 18px;
+  font-size:13.5px;
+  color:var(--ink);
+  margin:20px 0;
+}
+.policy-callout.warn{
+  background:var(--clay-soft);
+  color:var(--ink);
+}
+
+.policy-table{
+  width:100%;
+  border-collapse:collapse;
+  margin:16px 0 24px 0;
+  font-size:13.5px;
+  background:var(--card);
+  border-radius:var(--radius);
+  overflow:hidden;
+  box-shadow:var(--shadow);
+}
+.policy-table th, .policy-table td{
+  text-align:left;
+  padding:11px 14px;
+  border-bottom:1px solid var(--line);
+  vertical-align:top;
+  color:var(--graphite);
+}
+.policy-table td strong, .policy-table td code{color:var(--ink);}
+.policy-table tr:last-child td{border-bottom:none;}
+.policy-table th{
+  background:var(--paper);
+  font-weight:600;
+  color:var(--graphite);
+  font-size:11.5px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.policy-toc{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:20px 24px;
+  margin-bottom:32px;
+}
+.policy-toc h2{margin:0 0 12px 0;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--graphite);font-weight:700;}
+.policy-toc ol{margin:0;padding-left:20px;font-size:13.5px;color:var(--ink);}
+.policy-toc a{color:var(--ink);text-decoration:none;}
+.policy-toc a:hover{color:var(--flow);}
+
+.policy-footer{
+  border-top:1px solid var(--line);
+  margin-top:60px;
+  padding:28px 24px;
+  text-align:center;
+  color:var(--graphite-soft);
+  font-size:12.5px;
+}
+.policy-footer a{color:var(--graphite);}
+
+@media (max-width: 640px){
+  .policy-wrap{padding:32px 18px 80px 18px;}
+  .policy-wrap h1{font-size:26px;}
+  .policy-header{padding:14px 16px;}
+  .policy-header-right{gap:12px;}
+  .policy-nav{gap:12px;}
+  .policy-nav a{font-size:12.5px;}
+}

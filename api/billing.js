@@ -10,13 +10,13 @@
 // Set PayFast's notify_url to: {APP_BASE_URL}/api/billing?action=notify
 
 const { setCors } = require('../lib/util');
-const { verifyRequestToken } = require('../lib/verifyAuth');
+const { verifySession } = require('../lib/session');
 const { getAdmin, getDb } = require('../lib/firebaseAdmin');
 const { buildSubscriptionFields, PAYFAST_PROCESS_URL, validateItn, isRequestFromPayfast, cancelSubscription } = require('../lib/payfast');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 
-const MONTHLY_AMOUNT = 1000; // R1000/month flat rate
+const MONTHLY_AMOUNT = 699; // R699/month flat rate
 
 async function handleCheckout(req, res){
   if (req.method !== 'GET') return res.status(405).send('Method not allowed');
@@ -25,7 +25,7 @@ async function handleCheckout(req, res){
     return res.status(429).send('Too many attempts — please wait a minute and try again.');
   }
   let decoded;
-  try{ decoded = await verifyRequestToken(req); }
+  try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).send('You need to be signed in to subscribe. Go back to the CRM, sign in with Google, and try again.'); }
   logEvent('checkout_started', { uid: decoded.uid, ip });
 
@@ -68,7 +68,7 @@ async function handleCheckout(req, res){
 
 async function handleStatus(req, res){
   let decoded;
-  try{ decoded = await verifyRequestToken(req); }
+  try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   try{
     const doc = await getDb().collection('subscriptions').doc(decoded.uid).get();
@@ -83,7 +83,7 @@ async function handleStatus(req, res){
 
 async function handleHistory(req, res){
   let decoded;
-  try{ decoded = await verifyRequestToken(req); }
+  try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   try{
     const snap = await getDb().collection('subscriptions').doc(decoded.uid)
@@ -102,7 +102,7 @@ async function handleCancel(req, res){
     return res.status(429).json({ error: 'Too many attempts — please wait a minute and try again.' });
   }
   let decoded;
-  try{ decoded = await verifyRequestToken(req); }
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
 
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
@@ -155,7 +155,7 @@ async function handleDeleteAccount(req, res){
     return res.status(429).json({ error: 'Too many attempts — please wait a minute and try again.' });
   }
   let decoded;
-  try{ decoded = await verifyRequestToken(req); }
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   const uid = decoded.uid;
 
