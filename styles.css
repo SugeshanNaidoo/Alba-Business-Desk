@@ -120,6 +120,7 @@ input::placeholder,textarea::placeholder{color:var(--graphite-soft);}
   position:sticky;
   top:0;
   height:100vh;
+  overflow-y:auto;
 }
 .brand{
   display:flex;
@@ -541,6 +542,7 @@ tbody tr:last-child td{border-bottom:none;}
 }
 .menu-toggle svg{width:18px;height:18px;}
 .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(2px);z-index:55;}
+body.no-scroll{overflow:hidden;height:100vh;}
 .auth-loading-overlay{
   position:fixed;inset:0;background:var(--paper);z-index:250;
   display:none;align-items:center;justify-content:center;

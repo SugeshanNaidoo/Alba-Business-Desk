@@ -49,6 +49,7 @@ async function establishBackendSession(){
 
 function showSignedIn(user){
   document.getElementById('loginGate').classList.remove('active');
+  document.body.classList.remove('no-scroll');
   document.getElementById('sidebarSignInBtn').style.display = 'none';
   document.getElementById('sidebarAccountChip').style.display = 'flex';
   document.getElementById('sidebarUserName').textContent = user.displayName || user.email || 'Signed in';
@@ -70,6 +71,7 @@ function showSignedIn(user){
 }
 function showSignedOut(){
   document.getElementById('loginGate').classList.add('active');
+  document.body.classList.add('no-scroll');
   subscriptionCheckedOnce = false;
   document.getElementById('sidebarSignInBtn').style.display = 'flex';
   document.getElementById('sidebarAccountChip').style.display = 'none';
