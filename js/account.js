@@ -191,7 +191,7 @@ function downloadStatement(payment){
 
 document.getElementById('billingSubscribeBtn').addEventListener('click', async ()=>{
   const base = billingApiBase();
-  if(!cloudUser){ alert('Sign in with Google first.'); return; }
+  if(!cloudUser){ await showAlert('Sign in with Google first.'); return; }
   await establishBackendSession(); // make sure the session cookie is fresh before this full-page navigation
   window.location.href = `${base}/api/billing?action=checkout`;
 });
@@ -199,7 +199,7 @@ document.getElementById('billingSubscribeBtn').addEventListener('click', async (
 document.getElementById('billingCancelBtn').addEventListener('click', async ()=>{
   const base = billingApiBase();
   if(!cloudUser) return;
-  if(!confirm('Cancel your subscription? You will not be charged again, and access continues until PayFast confirms the cancellation.')) return;
+  if(!(await showConfirm('Cancel your subscription? You will not be charged again, and access continues until PayFast confirms the cancellation.', { title:'Cancel subscription', confirmLabel:'Cancel subscription', danger:true }))) return;
   const btn = document.getElementById('billingCancelBtn');
   btn.disabled = true; btn.textContent = 'Cancelling…';
   try{
@@ -208,10 +208,10 @@ document.getElementById('billingCancelBtn').addEventListener('click', async ()=>
       headers:{ 'X-CSRF-Token': getCsrfToken() }
     });
     const data = await res.json();
-    if(!res.ok){ alert(data.error || 'Could not cancel — please try again.'); }
-    else { alert('Subscription cancelled.'); }
+    if(!res.ok){ await showAlert(data.error || 'Could not cancel — please try again.'); }
+    else { await showAlert('Subscription cancelled.'); }
   }catch(err){
-    alert('Could not reach the billing backend.');
+    await showAlert('Could not reach the billing backend.');
   }
   btn.disabled = false; btn.textContent = 'Cancel subscription';
   refreshSubscriptionStatus();
@@ -220,7 +220,7 @@ document.getElementById('billingCancelBtn').addEventListener('click', async ()=>
 document.getElementById('billingDeleteAccountBtn').addEventListener('click', async ()=>{
   const base = billingApiBase();
   if(!cloudUser) return;
-  const typed = prompt('This permanently deletes your account, cancels any active subscription first, and removes all your CRM data. This cannot be undone.\n\nType DELETE to confirm.');
+  const typed = await showPrompt('This permanently deletes your account, cancels any active subscription first, and removes all your CRM data. This cannot be undone.\n\nType DELETE to confirm.', { title:'Delete account', confirmLabel:'Delete account', placeholder:'DELETE' });
   if(typed !== 'DELETE') return;
   const btn = document.getElementById('billingDeleteAccountBtn');
   btn.disabled = true; btn.textContent = 'Deleting…';
@@ -231,11 +231,11 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
     });
     const data = await res.json();
     if(!res.ok){
-      alert(data.error || 'Could not delete your account — please try again.');
+      await showAlert(data.error || 'Could not delete your account — please try again.');
       btn.disabled = false; btn.textContent = 'Delete my account & all data';
       return;
     }
-    alert('Your account and all data have been deleted.');
+    await showAlert('Your account and all data have been deleted.');
     await endBackendSession();
     if(cloudAuth) cloudAuth.signOut();
     localStorage.removeItem(DB_KEY);
@@ -243,18 +243,18 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
     saveData(DATA);
     renderAll();
   }catch(err){
-    alert('Could not reach the billing backend.');
+    await showAlert('Could not reach the billing backend.');
     btn.disabled = false; btn.textContent = 'Delete my account & all data';
   }
 });
 
 /* If we've just been redirected back from PayFast, show the result */
-(function handleBillingRedirect(){
+(async function handleBillingRedirect(){
   const params = new URLSearchParams(window.location.search);
   const result = params.get('billing');
   if(!result) return;
-  if(result === 'success') alert('Payment received — thank you! It may take a few seconds for your subscription status to update.');
-  if(result === 'cancelled') alert('Checkout was cancelled — no payment was made.');
+  if(result === 'success') await showAlert('Payment received — thank you! It may take a few seconds for your subscription status to update.');
+  if(result === 'cancelled') await showAlert('Checkout was cancelled — no payment was made.');
   params.delete('billing');
   const newUrl = window.location.pathname + (params.toString() ? '?'+params.toString() : '');
   window.history.replaceState({}, '', newUrl);
@@ -316,13 +316,13 @@ function connectFirebase(config){
 }
 function requestGoogleSignIn(){
   if(!FIREBASE_CONFIG){
-    alert('Cloud sync isn\'t configured for this workspace yet.');
+    showAlert('Cloud sync isn\'t configured for this workspace yet.');
     return;
   }
   if(!cloudAuth){ connectFirebase(FIREBASE_CONFIG); }
   const provider = new firebase.auth.GoogleAuthProvider();
   cloudAuth.signInWithPopup(provider).catch(err=>{
-    if(err && err.code !== 'auth/popup-closed-by-user') alert('Sign-in did not complete: ' + err.message);
+    if(err && err.code !== 'auth/popup-closed-by-user') showAlert('Sign-in did not complete: ' + err.message);
   });
 }
 async function endBackendSession(){

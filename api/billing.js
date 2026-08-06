@@ -200,6 +200,11 @@ async function handleNotify(req, res){
   const body = req.body || {};
   const passphrase = process.env.PAYFAST_PASSPHRASE || '';
   const remoteIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+  // Logged unconditionally, before any validation — if PayFast reports a
+  // delivery failure (e.g. their vague "Invalid Header" message) with no
+  // further detail, this is what tells us what they actually sent rather
+  // than guessing blind a second time.
+  console.log('ITN received:', JSON.stringify(body));
   if(!(await checkRateLimit(`notify:${remoteIp}`, { limit: 30, windowSeconds: 60 }))){
     console.error('ITN rate-limited from', remoteIp);
     return res.status(429).send('Too many requests');
@@ -219,8 +224,12 @@ async function handleNotify(req, res){
     }
     const uid = body.m_payment_id;
     if(!uid){
-      console.error('ITN missing m_payment_id — cannot associate with an account');
-      return res.status(400).send('Missing account reference');
+      // Not every notification PayFast sends is tied to one specific
+      // payment (a subscription lifecycle event, for instance, may not
+      // carry it) — acknowledge receipt rather than returning an error for
+      // something we simply have nothing to act on.
+      console.log('ITN has no m_payment_id — acknowledging without action:', JSON.stringify(body));
+      return res.status(200).send('OK');
     }
 
     const status = (body.payment_status || '').toUpperCase();

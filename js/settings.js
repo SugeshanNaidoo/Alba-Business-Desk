@@ -331,7 +331,7 @@ async function refreshConnectionStatus(){
     gcal_denied: 'Google Calendar connection was cancelled.',
     gcal_error: 'Something went wrong connecting Google Calendar — check the backend logs.'
   };
-  if(messages[result]) alert(messages[result]);
+  if(messages[result]) showAlert(messages[result]);
   params.delete('social_connect');
   const newUrl = window.location.pathname + (params.toString() ? '?'+params.toString() : '');
   window.history.replaceState({}, '', newUrl);
@@ -343,8 +343,8 @@ document.getElementById('exportDataBtn').addEventListener('click',()=>{
   a.download = 'crm-export.json';
   a.click();
 });
-document.getElementById('resetDataBtn').addEventListener('click',()=>{
-  if(!confirm('This replaces all current data with the sample dataset. Continue?')) return;
+document.getElementById('resetDataBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('This replaces all current data with the sample dataset. Continue?', { title:'Reset to sample data', confirmLabel:'Reset', danger:true }))) return;
   DATA = defaultData();
   saveData(DATA);
   renderAll();
@@ -375,29 +375,29 @@ function validateImportFile(file, { extensions, mimeTypes, maxSizeMB = 15 }){
 document.getElementById('importDataBtn').addEventListener('click',()=>{
   document.getElementById('importDataFile').click();
 });
-document.getElementById('importDataFile').addEventListener('change', e=>{
+document.getElementById('importDataFile').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
   const validationError = validateImportFile(file, { extensions:['.json'], mimeTypes:['application/json','text/json',''] });
-  if(validationError){ alert(validationError); e.target.value=''; return; }
+  if(validationError){ await showAlert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
-  reader.onload = evt=>{
+  reader.onload = async evt=>{
     try{
       const parsed = JSON.parse(evt.target.result);
       const requiredKeys = ['contacts','deals','tasks','settings','stages'];
       const looksValid = requiredKeys.every(k=>k in parsed);
-      if(!looksValid){ alert('That file doesn\'t look like an Alba Business Desk export — missing expected fields.'); return; }
-      if(!confirm('This will replace all current data with the contents of this file. Continue?')) return;
+      if(!looksValid){ await showAlert('That file doesn\'t look like an Alba Business Desk export — missing expected fields.'); return; }
+      if(!(await showConfirm('This will replace all current data with the contents of this file. Continue?', { title:'Import data', confirmLabel:'Import', danger:true }))) return;
       parsed.activity = parsed.activity || [];
       DATA = migrateData(parsed);
       saveData(DATA);
       renderAll();
     }catch(err){
-      alert('Could not read that file as JSON.');
+      await showAlert('Could not read that file as JSON.');
     }
     e.target.value = '';
   };
-  reader.onerror = ()=>{ alert('Could not read that file.'); e.target.value=''; };
+  reader.onerror = async ()=>{ await showAlert('Could not read that file.'); e.target.value=''; };
   reader.readAsText(file);
 });
 
@@ -440,18 +440,18 @@ document.getElementById('exportContactsCsvBtn').addEventListener('click',()=>{
 document.getElementById('importContactsCsvBtn').addEventListener('click',()=>{
   document.getElementById('importContactsCsvFile').click();
 });
-document.getElementById('importContactsCsvFile').addEventListener('change', e=>{
+document.getElementById('importContactsCsvFile').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file) return;
   const validationError = validateImportFile(file, { extensions:['.csv'], mimeTypes:['text/csv','application/vnd.ms-excel','text/plain',''] });
-  if(validationError){ alert(validationError); e.target.value=''; return; }
+  if(validationError){ await showAlert(validationError); e.target.value=''; return; }
   const reader = new FileReader();
-  reader.onload = evt=>{
+  reader.onload = async evt=>{
     const rows = parseCsv(evt.target.result);
-    if(!rows.length){ alert('That CSV looks empty.'); return; }
+    if(!rows.length){ await showAlert('That CSV looks empty.'); return; }
     const header = rows[0].map(h=>h.trim().toLowerCase());
     const idx = { name: header.indexOf('name'), company: header.indexOf('company'), email: header.indexOf('email'), phone: header.indexOf('phone'), tag: header.indexOf('tag'), notes: header.indexOf('notes') };
-    if(idx.name===-1){ alert('The CSV needs at least a "Name" column.'); return; }
+    if(idx.name===-1){ await showAlert('The CSV needs at least a "Name" column.'); return; }
     const existingEmails = new Set(DATA.contacts.map(c=>(c.email||'').toLowerCase()).filter(Boolean));
     let added = 0, skipped = 0;
     for(let i=1;i<rows.length;i++){
@@ -473,7 +473,7 @@ document.getElementById('importContactsCsvFile').addEventListener('change', e=>{
     }
     logActivity(`Imported ${added} contact${added===1?'':'s'} from CSV${skipped?` (${skipped} duplicate${skipped===1?'':'s'} skipped)`:''}`);
     saveData(DATA); renderAll();
-    alert(`Imported ${added} contact${added===1?'':'s'}.${skipped?` Skipped ${skipped} duplicate email${skipped===1?'':'s'}.`:''}`);
+    await showAlert(`Imported ${added} contact${added===1?'':'s'}.${skipped?` Skipped ${skipped} duplicate email${skipped===1?'':'s'}.`:''}`);
     e.target.value = '';
   };
   reader.readAsText(file);

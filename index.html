@@ -256,18 +256,20 @@
       </div>
 
       <div class="panel" id="gcalEventsPanel" style="display:none;">
-        <div class="panel-head">
-          <h3>Upcoming events</h3>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-ghost btn-sm" id="refreshCalendarEventsBtn">Refresh</button>
-            <button class="btn btn-primary btn-sm" id="addCalendarEventBtn">+ New event</button>
-          </div>
+        <div class="cal-nav">
+          <button class="cal-nav-btn" id="calPrevMonthBtn" aria-label="Previous month">&larr;</button>
+          <div class="cal-nav-label" id="calMonthLabel"></div>
+          <button class="cal-nav-btn" id="calNextMonthBtn" aria-label="Next month">&rarr;</button>
+          <button class="btn btn-ghost btn-sm" id="calTodayBtn">Today</button>
+          <button class="btn btn-ghost btn-sm" id="refreshCalendarEventsBtn">Refresh</button>
+          <button class="btn btn-primary btn-sm" id="addCalendarEventBtn" style="margin-left:auto;">+ New event</button>
         </div>
-        <div id="calendarEventsList"></div>
-        <div class="empty-state" id="calendarEventsEmpty" style="display:none;">
-          <h3>Nothing coming up</h3>
-          <p>Events on your connected calendar for the next 30 days will show up here.</p>
+        <div class="cal-weekdays">
+          <div class="cal-weekday">Sun</div><div class="cal-weekday">Mon</div><div class="cal-weekday">Tue</div>
+          <div class="cal-weekday">Wed</div><div class="cal-weekday">Thu</div><div class="cal-weekday">Fri</div>
+          <div class="cal-weekday">Sat</div>
         </div>
+        <div class="cal-grid" id="calendarGrid"></div>
       </div>
     </div>
 
@@ -626,6 +628,41 @@
       <button class="btn btn-danger-ghost" id="deleteContactBtn" style="display:none;margin-right:auto;">Delete</button>
       <button class="btn btn-ghost" data-close>Cancel</button>
       <button class="btn btn-primary" id="saveContactBtn">Save contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog (replaces native alert/confirm/prompt) -->
+<div class="dialog-overlay" id="dialogOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-body" style="padding-top:26px;">
+      <h3 id="dialogTitle" style="margin:0 0 8px 0;font-size:16px;"></h3>
+      <p id="dialogMessage" class="topbar-sub" style="margin:0;white-space:pre-wrap;"></p>
+      <div class="field" id="dialogInputWrap" style="display:none;margin-top:14px;margin-bottom:0;">
+        <input type="text" id="dialogInput">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="dialogCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="dialogConfirmBtn">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day View Modal -->
+<div class="overlay" id="dayViewModalOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3 id="dayViewTitle">Day</h3><button class="modal-close" data-close>&times;</button></div>
+    <div class="modal-body">
+      <div id="dayViewEventsList"></div>
+      <div class="empty-state" id="dayViewEmpty" style="display:none;padding:16px 0;">
+        <h3>Nothing scheduled</h3>
+        <p>No events on this day yet.</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Close</button>
+      <button class="btn btn-primary" id="dayViewAddEventBtn">+ Add event</button>
     </div>
   </div>
 </div>

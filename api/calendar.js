@@ -154,6 +154,9 @@ async function handleCreateEvent(req, res){
   if(isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start){
     return res.status(400).json({ error: 'Please provide a valid start and end time, with the end after the start.' });
   }
+  if(start.getTime() < Date.now() - 2*60*1000){ // 2-minute grace window for normal request latency
+    return res.status(400).json({ error: "That time has already passed — you can't create an event in the past." });
+  }
   try{
     const result = await createEvent({
       summary, description: description || '',

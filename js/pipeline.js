@@ -147,12 +147,12 @@ document.getElementById('dealLogAddBtn').addEventListener('click',()=>{
   renderDashboard();
 });
 document.getElementById('addDealBtn').addEventListener('click',()=>openDealModal(null));
-document.getElementById('saveDealBtn').addEventListener('click',()=>{
+document.getElementById('saveDealBtn').addEventListener('click', async ()=>{
   const title = document.getElementById('dTitle').value.trim();
-  if(!title){ alert('Please enter a deal title.'); return; }
+  if(!title){ await showAlert('Please enter a deal title.'); return; }
   const newStage = document.getElementById('dStage').value;
   if(newStage==='Lost' && !document.getElementById('dLostReason').value){
-    if(!confirm('No lost reason selected — save anyway? Setting one helps the Reports view break down why deals are lost.')) return;
+    if(!(await showConfirm('No lost reason selected — save anyway? Setting one helps the Reports view break down why deals are lost.', { title:'Save without a lost reason?', confirmLabel:'Save anyway' }))) return;
   }
   const payload = {
     title, contactId: document.getElementById('dContact').value,
@@ -177,8 +177,8 @@ document.getElementById('saveDealBtn').addEventListener('click',()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deleteDealBtn').addEventListener('click',()=>{
-  if(!confirm('Delete this deal?')) return;
+document.getElementById('deleteDealBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this deal?', { title:'Delete deal', confirmLabel:'Delete', danger:true }))) return;
   DATA.deals = DATA.deals.filter(d=>d.id!==editingDealId);
   saveData(DATA); closeModals(); renderAll();
 });

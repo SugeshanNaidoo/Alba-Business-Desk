@@ -81,9 +81,9 @@ function openTaskModal(id){
   document.getElementById('taskModalOverlay').classList.add('active');
 }
 document.getElementById('addTaskBtn').addEventListener('click',()=>openTaskModal(null));
-document.getElementById('saveTaskBtn').addEventListener('click',()=>{
+document.getElementById('saveTaskBtn').addEventListener('click', async ()=>{
   const title = document.getElementById('tTitle').value.trim();
-  if(!title){ alert('Please enter a task.'); return; }
+  if(!title){ await showAlert('Please enter a task.'); return; }
   const relVal = document.getElementById('tRelated').value;
   const [relatedType, relatedId] = relVal ? relVal.split(':') : [null,null];
   const payload = { title, dueDate: document.getElementById('tDue').value,
@@ -97,8 +97,8 @@ document.getElementById('saveTaskBtn').addEventListener('click',()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deleteTaskBtn').addEventListener('click',()=>{
-  if(!confirm('Delete this task?')) return;
+document.getElementById('deleteTaskBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this task?', { title:'Delete task', confirmLabel:'Delete', danger:true }))) return;
   DATA.tasks = DATA.tasks.filter(t=>t.id!==editingTaskId);
   saveData(DATA); closeModals(); renderAll();
 });

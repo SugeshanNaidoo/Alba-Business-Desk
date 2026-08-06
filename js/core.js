@@ -12,6 +12,68 @@
 const BACKEND_BASE = '';
 
 const DB_KEY = 'flowline_crm_data_v1';
+
+/* ---------- Dialogs (replace native alert/confirm/prompt) ---------- */
+let _dialogResolve = null;
+function _closeDialog(result){
+  document.getElementById('dialogOverlay').classList.remove('active');
+  if(_dialogResolve){ const r = _dialogResolve; _dialogResolve = null; r(result); }
+}
+function showAlert(message, { title = 'Notice' } = {}){
+  return new Promise(resolve=>{
+    _dialogResolve = resolve;
+    document.getElementById('dialogTitle').textContent = title;
+    document.getElementById('dialogMessage').textContent = message;
+    document.getElementById('dialogInputWrap').style.display = 'none';
+    document.getElementById('dialogCancelBtn').style.display = 'none';
+    const okBtn = document.getElementById('dialogConfirmBtn');
+    okBtn.textContent = 'OK';
+    okBtn.className = 'btn btn-primary';
+    okBtn.onclick = ()=>_closeDialog(true);
+    document.getElementById('dialogOverlay').classList.add('active');
+  });
+}
+function showConfirm(message, { title = 'Please confirm', confirmLabel = 'Confirm', danger = false } = {}){
+  return new Promise(resolve=>{
+    _dialogResolve = resolve;
+    document.getElementById('dialogTitle').textContent = title;
+    document.getElementById('dialogMessage').textContent = message;
+    document.getElementById('dialogInputWrap').style.display = 'none';
+    const cancelBtn = document.getElementById('dialogCancelBtn');
+    cancelBtn.style.display = 'inline-flex';
+    cancelBtn.onclick = ()=>_closeDialog(false);
+    const okBtn = document.getElementById('dialogConfirmBtn');
+    okBtn.textContent = confirmLabel;
+    okBtn.className = danger ? 'btn btn-danger-solid' : 'btn btn-primary';
+    okBtn.onclick = ()=>_closeDialog(true);
+    document.getElementById('dialogOverlay').classList.add('active');
+  });
+}
+function showPrompt(message, { title = 'Input needed', defaultValue = '', confirmLabel = 'OK', placeholder = '' } = {}){
+  return new Promise(resolve=>{
+    _dialogResolve = resolve;
+    document.getElementById('dialogTitle').textContent = title;
+    document.getElementById('dialogMessage').textContent = message;
+    const inputWrap = document.getElementById('dialogInputWrap');
+    const input = document.getElementById('dialogInput');
+    inputWrap.style.display = 'block';
+    input.value = defaultValue;
+    input.placeholder = placeholder;
+    const cancelBtn = document.getElementById('dialogCancelBtn');
+    cancelBtn.style.display = 'inline-flex';
+    cancelBtn.onclick = ()=>_closeDialog(null);
+    const okBtn = document.getElementById('dialogConfirmBtn');
+    okBtn.textContent = confirmLabel;
+    okBtn.className = 'btn btn-primary';
+    okBtn.onclick = ()=>_closeDialog(input.value);
+    input.onkeydown = e=>{ if(e.key==='Enter') _closeDialog(input.value); };
+    document.getElementById('dialogOverlay').classList.add('active');
+    setTimeout(()=>input.focus(), 50);
+  });
+}
+document.getElementById('dialogOverlay').addEventListener('click', e=>{
+  if(e.target.id === 'dialogOverlay') _closeDialog(false);
+});
 let firebaseApp = null, cloudAuth = null, cloudDb = null, cloudUser = null, cloudSaveTimer = null;
 const STAGE_COLORS = ['stage-lead','stage-mid','stage-mid','stage-mid','stage-won','stage-lost'];
 
@@ -346,11 +408,11 @@ function sanitizeHtml(html){
 }
 function wireRichTextToolbar(container){
   container.querySelectorAll('.rt-btn').forEach(btn=>{
-    btn.addEventListener('click', e=>{
+    btn.addEventListener('click', async e=>{
       e.preventDefault();
       const cmd = btn.dataset.rtCmd;
       if(cmd==='createLink'){
-        const url = prompt('Link URL:', 'https://');
+        const url = await showPrompt('Enter the link URL:', { title:'Add link', defaultValue:'https://', confirmLabel:'Add link' });
         if(url) document.execCommand(cmd, false, url);
       } else {
         document.execCommand(cmd, false, null);

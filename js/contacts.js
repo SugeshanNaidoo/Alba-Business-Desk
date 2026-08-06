@@ -117,9 +117,9 @@ function openCompanyModal(id){
   document.getElementById('companyModalOverlay').classList.add('active');
 }
 document.getElementById('addCompanyBtn').addEventListener('click',()=>openCompanyModal(null));
-document.getElementById('saveCompanyBtn').addEventListener('click',()=>{
+document.getElementById('saveCompanyBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('coName').value.trim();
-  if(!name){ alert('Please enter a company name.'); return; }
+  if(!name){ await showAlert('Please enter a company name.'); return; }
   const payload = {
     name,
     industry: document.getElementById('coIndustry').value.trim(),
@@ -135,8 +135,8 @@ document.getElementById('saveCompanyBtn').addEventListener('click',()=>{
   }
   saveData(DATA); closeModals(); renderCompanies(); renderContacts();
 });
-document.getElementById('deleteCompanyBtn').addEventListener('click',()=>{
-  if(!confirm('Delete this company? Linked contacts keep their own record but lose the company link.')) return;
+document.getElementById('deleteCompanyBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this company? Linked contacts keep their own record but lose the company link.', { title:'Delete company', confirmLabel:'Delete', danger:true }))) return;
   DATA.companies = DATA.companies.filter(co=>co.id!==editingCompanyId);
   DATA.contacts.forEach(c=>{ if(c.companyId===editingCompanyId) c.companyId=null; });
   saveData(DATA); closeModals(); renderCompanies(); renderContacts();
@@ -188,9 +188,9 @@ function openContactModal(id){
   document.getElementById('contactModalOverlay').classList.add('active');
 }
 document.getElementById('addContactBtn').addEventListener('click',()=>openContactModal(null));
-document.getElementById('saveContactBtn').addEventListener('click',()=>{
+document.getElementById('saveContactBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('cName').value.trim();
-  if(!name){ alert('Please enter a name.'); return; }
+  if(!name){ await showAlert('Please enter a name.'); return; }
   const notesHtml = sanitizeHtml(document.getElementById('cNotes').innerHTML);
   const customFields = collectCustomFieldValues(document.getElementById('cCustomFieldsContainer'));
   const companyId = document.getElementById('cCompanyLink').value || null;
@@ -211,8 +211,8 @@ document.getElementById('saveContactBtn').addEventListener('click',()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deleteContactBtn').addEventListener('click',()=>{
-  if(!confirm('Delete this contact? Related deals will keep the deal but lose the contact link.')) return;
+document.getElementById('deleteContactBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this contact? Related deals will keep the deal but lose the contact link.', { title:'Delete contact', confirmLabel:'Delete', danger:true }))) return;
   DATA.contacts = DATA.contacts.filter(c=>c.id!==editingContactId);
   saveData(DATA); closeModals(); closeDrawer(); renderAll();
 });

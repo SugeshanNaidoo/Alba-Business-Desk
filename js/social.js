@@ -345,8 +345,8 @@ document.getElementById('savePlatformBtn').addEventListener('click', ()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deletePlatformBtn').addEventListener('click', ()=>{
-  if(!confirm('Delete this platform? Its logged posts, mentions, and follower history stay but will show as unlinked.')) return;
+document.getElementById('deletePlatformBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this platform? Its logged posts, mentions, and follower history stay but will show as unlinked.', { title:'Delete platform', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialPlatforms = DATA.socialPlatforms.filter(p=>p.id!==editingPlatformId);
   saveData(DATA); closeModals(); renderAll();
 });
@@ -396,16 +396,16 @@ function openPostModal(id){
   document.getElementById('deletePostBtn').style.display = p ? 'inline-flex' : 'none';
   document.getElementById('postModalOverlay').classList.add('active');
 }
-document.getElementById('addPostBtn').addEventListener('click', ()=>{
-  if(!DATA.socialPlatforms.length){ alert('Add a platform first.'); openPlatformModal(null); return; }
+document.getElementById('addPostBtn').addEventListener('click', async ()=>{
+  if(!DATA.socialPlatforms.length){ await showAlert('Add a platform first.'); openPlatformModal(null); return; }
   openPostModal(null);
 });
-document.getElementById('savePostBtn').addEventListener('click', ()=>{
+document.getElementById('savePostBtn').addEventListener('click', async ()=>{
   const platformId = document.getElementById('postPlatform').value;
-  if(!platformId){ alert('Add a platform first.'); return; }
+  if(!platformId){ await showAlert('Add a platform first.'); return; }
   const date = document.getElementById('postDate').value;
   const time = document.getElementById('postTime').value || '12:00';
-  if(!date){ alert('Please set a date.'); return; }
+  if(!date){ await showAlert('Please set a date.'); return; }
   const postedAt = new Date(`${date}T${time}`).toISOString();
   const payload = {
     platformId,
@@ -424,8 +424,8 @@ document.getElementById('savePostBtn').addEventListener('click', ()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deletePostBtn').addEventListener('click', ()=>{
-  if(!confirm('Delete this post?')) return;
+document.getElementById('deletePostBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this post?', { title:'Delete post', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialPosts = DATA.socialPosts.filter(p=>p.id!==editingPostId);
   saveData(DATA); closeModals(); renderAll();
 });
@@ -445,14 +445,14 @@ function openMentionModal(id){
   document.getElementById('deleteMentionBtn').style.display = m ? 'inline-flex' : 'none';
   document.getElementById('mentionModalOverlay').classList.add('active');
 }
-document.getElementById('addMentionBtn').addEventListener('click', ()=>{
-  if(!DATA.socialPlatforms.length){ alert('Add a platform first.'); openPlatformModal(null); return; }
+document.getElementById('addMentionBtn').addEventListener('click', async ()=>{
+  if(!DATA.socialPlatforms.length){ await showAlert('Add a platform first.'); openPlatformModal(null); return; }
   openMentionModal(null);
 });
-document.getElementById('saveMentionBtn').addEventListener('click', ()=>{
+document.getElementById('saveMentionBtn').addEventListener('click', async ()=>{
   const platformId = document.getElementById('mentionPlatform').value;
   const account = document.getElementById('mentionAccount').value.trim();
-  if(!platformId || !account){ alert('Please choose a platform and enter the account that mentioned you.'); return; }
+  if(!platformId || !account){ await showAlert('Please choose a platform and enter the account that mentioned you.'); return; }
   const payload = {
     platformId, account,
     date: document.getElementById('mentionDate').value || new Date().toISOString().slice(0,10),
@@ -467,8 +467,8 @@ document.getElementById('saveMentionBtn').addEventListener('click', ()=>{
   }
   saveData(DATA); closeModals(); renderAll();
 });
-document.getElementById('deleteMentionBtn').addEventListener('click', ()=>{
-  if(!confirm('Delete this mention?')) return;
+document.getElementById('deleteMentionBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Delete this mention?', { title:'Delete mention', confirmLabel:'Delete', danger:true }))) return;
   DATA.socialMentions = DATA.socialMentions.filter(m=>m.id!==editingMentionId);
   saveData(DATA); closeModals(); renderAll();
 });
