@@ -351,10 +351,15 @@ document.getElementById('dashTaskLink').addEventListener('click',()=>showView('t
 function openSidebar(){
   document.querySelector('.sidebar').classList.add('open');
   document.getElementById('sidebarBackdrop').classList.add('active');
+  // Separate class from the auth gate's `no-scroll` so the two locks can
+  // never clobber each other. Scoped to mobile widths in CSS, so it's inert
+  // on desktop where the sidebar is permanent.
+  document.body.classList.add('sidebar-open');
 }
 function closeSidebar(){
   document.querySelector('.sidebar').classList.remove('open');
   document.getElementById('sidebarBackdrop').classList.remove('active');
+  document.body.classList.remove('sidebar-open');
 }
 document.getElementById('menuToggle').addEventListener('click', openSidebar);
 document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
