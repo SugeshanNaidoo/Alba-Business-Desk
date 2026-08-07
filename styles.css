@@ -192,9 +192,14 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
 }
 .sidebar-backdrop.active{display:block;}
 
-.brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px;min-width:0;}
-.brand-logo{height:26px;width:auto;transition:opacity .15s ease;}
-.nav{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;}
+.brand{display:flex;align-items:center;gap:9px;padding:6px 8px 20px;min-width:0;}
+.brand-logo{height:34px;width:auto;max-width:100%;transition:opacity .15s ease;}
+/* flex-grow to push the account block to the bottom on tall screens, but
+   flex-shrink:0 so the nav can never be squeezed below its natural height.
+   With min-height:0 it would shrink while its items stayed full size,
+   spilling over and covering the account chip (and the sign-out inside it).
+   The sidebar scrolls instead. */
+.nav{display:flex;flex-direction:column;gap:2px;flex:1 0 auto;}
 .nav-item{
   display:flex;align-items:center;gap:11px;
   padding:9px 10px;border-radius:var(--radius-sm);
@@ -231,8 +236,12 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
 .account-chip-sub{font-size:11px;color:var(--graphite);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .account-chip-menu-btn{
   background:none;border:none;color:var(--graphite);cursor:pointer;
-  padding:4px;border-radius:6px;flex-shrink:0;display:flex;
+  padding:5px;border-radius:7px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
 }
+/* Without an explicit size an inline SVG falls back to 300x150 and destroys
+   the surrounding layout — every icon in the app needs a size rule. */
+.account-chip-menu-btn svg{width:18px;height:18px;flex-shrink:0;}
 .account-chip-menu-btn:hover{background:var(--hover-surface);color:var(--ink);}
 .account-menu{
   display:none;position:absolute;bottom:calc(100% + 6px);left:8px;right:8px;
@@ -738,16 +747,17 @@ tbody tr:hover{background:var(--hover-surface);}
 .info-row > span:last-child{text-align:right;min-width:0;overflow-wrap:break-word;}
 .stage-editor-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;min-width:0;}
 .stage-editor-row input{flex:1;min-width:0;}
-.theme-toggle-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+.theme-toggle-row{display:flex;gap:8px;align-items:stretch;}
 .theme-toggle-btn{
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:8px 14px;border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  flex:1;min-width:0;
+  padding:11px 14px;border-radius:var(--radius-sm);
   background:var(--card);border:1px solid var(--line-strong);
-  color:var(--ink);font-size:13px;font-weight:540;
+  color:var(--ink);font-size:14px;font-weight:550;
   cursor:pointer;font-family:inherit;
 }
 .theme-toggle-btn:hover{background:var(--hover-surface);}
-.theme-toggle-btn svg{width:16px;height:16px;}
+.theme-toggle-btn svg{width:18px;height:18px;flex-shrink:0;}
 
 /* ---------------------------------------------------- modals & overlays -- */
 /* Mobile: bottom sheet. Desktop: centred dialog. */
