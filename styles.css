@@ -439,22 +439,55 @@ input[type="color"]{padding:3px;height:40px;cursor:pointer;}
 input[type="checkbox"]{width:auto;min-width:0;accent-color:var(--flow);}
 .field-row{display:grid;grid-template-columns:1fr;gap:0 12px;}
 
-.richtext-editor{border:1px solid var(--line-strong);border-radius:var(--radius-sm);overflow:hidden;}
+/* The toolbar and the editable area are SIBLINGS in the markup, not a
+   wrapper and its child — they're styled to read as one joined control:
+   toolbar on top with rounded top corners, editor below with rounded
+   bottom corners and no doubled border between them. */
 .richtext-toolbar{
-  display:flex;gap:2px;padding:5px;flex-wrap:wrap;
-  border-bottom:1px solid var(--line);background:var(--control-track);
+  display:flex;gap:3px;padding:6px;flex-wrap:wrap;
+  border:1px solid var(--line-strong);
+  border-bottom:none;
+  border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+  background:var(--control-track);
 }
 .rt-btn{
-  width:28px;height:28px;border:none;background:none;border-radius:5px;
-  color:var(--graphite);cursor:pointer;font-size:13px;font-family:inherit;
-  display:flex;align-items:center;justify-content:center;
+  min-width:30px;height:28px;padding:0 8px;
+  border:none;background:none;border-radius:5px;
+  color:var(--graphite);cursor:pointer;
+  font-size:12.5px;font-family:inherit;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;
+  white-space:nowrap;flex-shrink:0;
 }
 .rt-btn:hover{background:var(--hover-surface);color:var(--ink);}
-.richtext-content{
-  padding:10px 12px;min-height:90px;font-size:14px;line-height:1.55;
-  outline:none;overflow-wrap:break-word;
+.rt-btn:active{background:var(--active-surface);}
+
+/* The contenteditable input itself. */
+.richtext-editor{
+  border:1px solid var(--line-strong);
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  background:var(--card);color:var(--ink);
+  padding:11px 12px;min-height:110px;max-height:280px;overflow-y:auto;
+  font-size:16px;              /* 16px keeps iOS from zooming on focus */
+  line-height:1.55;outline:none;
+  overflow-wrap:break-word;word-break:break-word;
+  transition:border-color .15s ease, box-shadow .15s ease;
 }
-.richtext-content:empty::before{content:attr(data-placeholder);color:var(--graphite-soft);}
+.richtext-editor:focus{
+  border-color:var(--flow);
+  box-shadow:0 0 0 3px var(--flow-soft);
+}
+.richtext-editor:empty::before{
+  content:attr(data-placeholder);color:var(--graphite-soft);pointer-events:none;
+}
+.richtext-editor ul,.richtext-editor ol{margin:6px 0;padding-left:22px;}
+.richtext-editor a{color:var(--flow);}
+
+/* Read-only rendering of saved notes (contact drawer). */
+.richtext-content{
+  font-size:13.5px;line-height:1.6;overflow-wrap:break-word;word-break:break-word;
+}
+.richtext-content ul,.richtext-content ol{margin:6px 0;padding-left:22px;}
+.richtext-content a{color:var(--flow);}
 
 /* ----------------------------------------------------------------- tables */
 /* Wrapper scrolls; the table itself never forces the page wider. */
@@ -526,6 +559,11 @@ tbody tr:hover{background:var(--hover-surface);}
 
 /* -------------------------------------------------------------- dashboard */
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+/* Below 600px these sit in 2 columns, so the third card would be orphaned
+   with a gap beside it — let it span the full row instead. */
+@media (max-width:599px){
+  .revenue-grid > :last-child, .stat-grid-3 > :last-child{grid-column:1 / -1;}
+}
 .stat-card{
   background:var(--card);border:1px solid var(--line);
   border-radius:var(--radius);padding:14px;
@@ -905,7 +943,7 @@ tbody tr:hover{background:var(--hover-surface);}
   .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
   /* Three revenue stats — keep them on one row so the card never shows a
      dead cell. minmax(0,1fr) guarantees they shrink rather than overflow. */
-  .revenue-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .revenue-grid,.stat-grid-3{grid-template-columns:repeat(3,minmax(0,1fr));}
   .platform-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));}
   .field-row{grid-template-columns:1fr 1fr;}
   .topbar h1{font-size:18px;}
@@ -927,7 +965,7 @@ tbody tr:hover{background:var(--hover-surface);}
 @media (min-width:900px){
   .stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));}
   .dash-grid{grid-template-columns:1.6fr 1fr;}
-  .revenue-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .revenue-grid,.stat-grid-3{grid-template-columns:repeat(3,minmax(0,1fr));}
   .panel{padding:20px;}
   /* Contact drawer becomes a right-hand side panel. */
   .drawer{
