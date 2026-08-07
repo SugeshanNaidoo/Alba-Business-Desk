@@ -193,7 +193,7 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
 .sidebar-backdrop.active{display:block;}
 
 .brand{display:flex;align-items:center;gap:9px;padding:6px 8px 20px;min-width:0;}
-.brand-logo{height:34px;width:auto;max-width:100%;transition:opacity .15s ease;}
+.brand-logo{height:40px;width:auto;max-width:100%;object-fit:contain;transition:opacity .15s ease;}
 /* flex-grow to push the account block to the bottom on tall screens, but
    flex-shrink:0 so the nav can never be squeezed below its natural height.
    With min-height:0 it would shrink while its items stayed full size,
@@ -338,6 +338,7 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
   margin-bottom:14px;min-width:0;
 }
 .toolbar > .topbar-sub{flex:1;min-width:0;}
+.toolbar > .btn:last-child{margin-left:auto;}
 .search-wrap{position:relative;flex:1;min-width:0;}
 .search-wrap svg{
   position:absolute;left:11px;top:50%;transform:translateY(-50%);
@@ -835,9 +836,13 @@ tbody tr:hover{background:var(--hover-surface);}
 }
 .drawer-overlay.active{display:block;}
 .drawer-head{
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  display:flex;flex-direction:column;align-items:stretch;gap:0;
   padding:16px;border-bottom:1px solid var(--line);flex-shrink:0;min-width:0;
 }
+/* Both rows inside the header span the full width, so the close button
+   lands against the right edge rather than beside the name. */
+.drawer-head > div{min-width:0;width:100%;}
+.drawer-head h2{overflow-wrap:break-word;}
 .drawer-body{
   padding:16px;overflow-y:auto;flex:1;
   overscroll-behavior:contain;min-width:0;
@@ -898,6 +903,9 @@ tbody tr:hover{background:var(--hover-surface);}
 @media (min-width:600px){
   :root{--gutter:22px;}
   .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  /* Three revenue stats — keep them on one row so the card never shows a
+     dead cell. minmax(0,1fr) guarantees they shrink rather than overflow. */
+  .revenue-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
   .platform-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));}
   .field-row{grid-template-columns:1fr 1fr;}
   .topbar h1{font-size:18px;}
@@ -919,7 +927,7 @@ tbody tr:hover{background:var(--hover-surface);}
 @media (min-width:900px){
   .stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));}
   .dash-grid{grid-template-columns:1.6fr 1fr;}
-  .revenue-grid{grid-template-columns:1fr 1fr;}
+  .revenue-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
   .panel{padding:20px;}
   /* Contact drawer becomes a right-hand side panel. */
   .drawer{
@@ -938,21 +946,28 @@ tbody tr:hover{background:var(--hover-surface);}
    ====================================================================== */
 @media (min-width:1100px){
   :root{--gutter:28px;}
-  .app{display:flex;}
+  /* The sidebar stays position:fixed here, exactly as it is on mobile — it
+     simply slides into view permanently. Using fixed rather than sticky is
+     deliberate: position:sticky on a flex item silently fails without
+     align-self:flex-start, and breaks again whenever an ancestor has
+     overflow-x:hidden (which body needs for the no-overflow guarantee).
+     Fixed sidesteps both, and .main is offset by the sidebar's width. */
   .sidebar{
-    position:sticky;top:0;
-    inset:auto;
-    transform:none;
-    width:var(--sidebar-w);flex-shrink:0;
+    position:fixed;
+    top:0;left:0;bottom:auto;
     height:100vh;height:100dvh;
+    transform:none;
+    will-change:auto;          /* only needed for the mobile slide-in */
+    width:var(--sidebar-w);
     background:var(--sidebar-glass);
     padding:20px 14px;
     transition:none;
   }
   .sidebar.open{transform:none;}
+  .brand-logo{height:48px;}
   .sidebar-backdrop, .sidebar-backdrop.active{display:none;}
   .menu-toggle{display:none;}
-  .main{flex:1;min-width:0;}
+  .main{margin-left:calc(var(--sidebar-w) + var(--safe-l));min-width:0;}
   .topbar{padding-left:var(--gutter);padding-right:var(--gutter);}
   .view{padding:26px var(--gutter) 48px;}
   .cal-day{min-height:96px;}
