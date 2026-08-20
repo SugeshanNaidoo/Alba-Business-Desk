@@ -3,6 +3,7 @@
 // events directly from within the CRM. Nothing here is public — every
 // action requires being signed in, same as billing.
 
+let gcalConnected = false;
 let calendarViewDate = new Date(); // which month is currently displayed
 let calendarEventsCache = [];
 
@@ -29,15 +30,15 @@ async function refreshGcalStatus(){
     const data = await res.json();
     if(data.connected){
       textEl.textContent = `Connected${data.calendarEmail ? ' — '+data.calendarEmail : ''}`;
-      btnLabel.textContent = 'Reconnect Google Calendar';
-      document.getElementById('disconnectGoogleCalendarBtn').style.display = 'inline-flex';
+      btnLabel.textContent = 'Disconnect Google Calendar';
+      gcalConnected = true;
       hint.textContent = 'Connected. Click any day to see, add, or edit its events.';
       eventsPanel.style.display = 'block';
       loadCalendarEvents();
     } else {
       textEl.textContent = 'Not connected';
       btnLabel.textContent = 'Connect Google Calendar';
-      document.getElementById('disconnectGoogleCalendarBtn').style.display = 'none';
+      gcalConnected = false;
       hint.textContent = 'Connect your calendar to see, create, and manage events right here.';
       eventsPanel.style.display = 'none';
     }
@@ -45,9 +46,29 @@ async function refreshGcalStatus(){
     textEl.textContent = 'Could not check status';
   }
 }
-document.getElementById('connectGoogleCalendarBtn').addEventListener('click', ()=>{
+/* One button, two states — connects when disconnected, disconnects when
+   connected, matching how the social platform buttons behave. */
+document.getElementById('connectGoogleCalendarBtn').addEventListener('click', async ()=>{
   if(!requireSubscriptionForAction()) return;
-  window.location.href = `${BACKEND_BASE}/api/calendar?action=connect`;
+  if(!gcalConnected){
+    window.location.href = `${BACKEND_BASE}/api/calendar?action=connect`;
+    return;
+  }
+  if(!(await showConfirm('Disconnect Google Calendar? Events already in your calendar stay there, but Alba Business Desk will no longer be able to read or manage them.', { title:'Disconnect Google Calendar', confirmLabel:'Disconnect', danger:true }))) return;
+  const btn = document.getElementById('connectGoogleCalendarBtn');
+  btn.disabled = true;
+  try{
+    const res = await fetch(`${BACKEND_BASE}/api/calendar?action=disconnect`, {
+      method:'POST', credentials:'include',
+      headers:{ 'X-CSRF-Token': getCsrfToken() }
+    });
+    const data = await res.json();
+    if(!res.ok) await showAlert(data.error || 'Could not disconnect.');
+  }catch(err){
+    await showAlert('Could not reach the calendar backend.');
+  }
+  btn.disabled = false;
+  refreshGcalStatus();
 });
 
 /* ---------- Month grid ---------- */
@@ -294,20 +315,4 @@ document.getElementById('deleteCalendarEventBtn').addEventListener('click', asyn
   }catch(err){
     await showAlert('Could not reach the calendar backend.');
   }
-});
-
-document.getElementById('disconnectGoogleCalendarBtn').addEventListener('click', async ()=>{
-  if(!(await showConfirm('Disconnect Google Calendar? Events already in your calendar stay there, but Alba Business Desk will no longer be able to read or manage them.', { title:'Disconnect Google Calendar', confirmLabel:'Disconnect', danger:true }))) return;
-  try{
-    const res = await fetch(`${BACKEND_BASE}/api/calendar?action=disconnect`, {
-      method:'POST', credentials:'include',
-      headers:{ 'X-CSRF-Token': getCsrfToken() }
-    });
-    const data = await res.json();
-    if(!res.ok){ await showAlert(data.error || 'Could not disconnect.'); return; }
-  }catch(err){
-    await showAlert('Could not reach the calendar backend.');
-    return;
-  }
-  refreshGcalStatus();
 });

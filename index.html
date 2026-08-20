@@ -16,7 +16,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=1787220204">
+<link rel="stylesheet" href="styles.css?v=1787221554">
 </head>
 <body class="no-scroll">
 <div class="auth-loading-overlay active" id="authLoadingOverlay">
@@ -281,7 +281,6 @@
             <svg viewBox="0 0 18 18" width="16" height="16"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.9v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.17.27-1.7V4.97H.9A9 9 0 000 9c0 1.45.35 2.83.9 4.03l3.05-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.9 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
             <span id="connectGoogleCalendarBtnLabel">Connect Google Calendar</span>
           </button>
-          <button class="btn btn-danger-ghost btn-sm" id="disconnectGoogleCalendarBtn" style="display:none;margin-top:10px;">Disconnect Google Calendar</button>
           <p class="topbar-sub" style="margin-top:10px;" id="gcalHint">Connect your calendar to see, create, and manage events right here.</p>
         </div>
       </div>
@@ -560,15 +559,15 @@
               <div style="display:flex;flex-direction:column;gap:10px;max-width:280px;">
                 <button class="connect-btn connect-btn-facebook" id="connectFacebookBtn">
                   <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="10" fill="#fff"/><path fill="#1877F2" d="M13.5 10.3h-2v6.6h-2.7v-6.6H7.2V7.9h1.6V6.3c0-1.6.8-3.1 3.3-3.1h2.2v2.4H13c-.3 0-.8.2-.8.9v1.4h2.3l-.3 2.4z"/></svg>
-                  Continue with Facebook
+                  <span id="connectFacebookBtnLabel">Continue with Facebook</span>
                 </button>
                 <button class="connect-btn connect-btn-instagram" id="connectInstagramBtn">
                   <svg viewBox="0 0 20 20" width="18" height="18"><rect x="1" y="1" width="18" height="18" rx="5" fill="#fff"/><rect x="5.5" y="5.5" width="9" height="9" rx="3" fill="none" stroke="#E1306C" stroke-width="1.5"/><circle cx="14.3" cy="5.7" r="1.1" fill="#E1306C"/></svg>
-                  Continue with Instagram
+                  <span id="connectInstagramBtnLabel">Continue with Instagram</span>
                 </button>
                 <button class="connect-btn connect-btn-tiktok" id="connectTiktokBtn">
                   <svg viewBox="0 0 20 20" width="18" height="18"><path fill="#fff" d="M13.4 4c.4.9 1.3 1.6 2.3 1.7v2.1c-.9 0-1.8-.3-2.6-.8v4.4c0 2.3-1.9 4.1-4.2 4.1S4.7 13.7 4.7 11.4c0-2.2 1.7-4 3.9-4.1v2.1c-1 .1-1.8.9-1.8 2 0 1.1.9 2 2 2s2.1-.8 2.1-2V2.3h2.1c0 .6.1 1.2.4 1.7z"/></svg>
-                  Continue with TikTok
+                  <span id="connectTiktokBtnLabel">Continue with TikTok</span>
                 </button>
               </div>
               <button class="btn btn-ghost btn-sm" id="refreshConnectionStatusBtn" style="margin-top:14px;">Refresh status</button>
@@ -856,13 +855,7 @@
         <select id="pName">
           <option value="Instagram">Instagram</option>
           <option value="Facebook">Facebook</option>
-          <option value="X (Twitter)">X (Twitter)</option>
-          <option value="LinkedIn">LinkedIn</option>
           <option value="TikTok">TikTok</option>
-          <option value="YouTube">YouTube</option>
-          <option value="Pinterest">Pinterest</option>
-          <option value="Threads">Threads</option>
-          <option value="Other">Other</option>
         </select>
       </div>
       <div class="field"><label>Handle</label><input type="text" id="pHandle" placeholder="@yourbusiness"></div>
@@ -1003,18 +996,18 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="js/assets.js?v=1787220204"></script>
-<script src="js/core.js?v=1787220204"></script>
-<script src="js/account.js?v=1787220204"></script>
-<script src="js/dashboard.js?v=1787220204"></script>
-<script src="js/contacts.js?v=1787220204"></script>
-<script src="js/whatsapp.js?v=1787220204"></script>
-<script src="js/pipeline.js?v=1787220204"></script>
-<script src="js/tasks.js?v=1787220204"></script>
-<script src="js/scheduling.js?v=1787220204"></script>
-<script src="js/reports.js?v=1787220204"></script>
-<script src="js/social.js?v=1787220204"></script>
-<script src="js/settings.js?v=1787220204"></script>
-<script src="js/init.js?v=1787220204"></script>
+<script src="js/assets.js?v=1787221554"></script>
+<script src="js/core.js?v=1787221554"></script>
+<script src="js/account.js?v=1787221554"></script>
+<script src="js/dashboard.js?v=1787221554"></script>
+<script src="js/contacts.js?v=1787221554"></script>
+<script src="js/whatsapp.js?v=1787221554"></script>
+<script src="js/pipeline.js?v=1787221554"></script>
+<script src="js/tasks.js?v=1787221554"></script>
+<script src="js/scheduling.js?v=1787221554"></script>
+<script src="js/reports.js?v=1787221554"></script>
+<script src="js/social.js?v=1787221554"></script>
+<script src="js/settings.js?v=1787221554"></script>
+<script src="js/init.js?v=1787221554"></script>
 </body>
 </html>

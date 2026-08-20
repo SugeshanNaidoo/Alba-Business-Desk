@@ -307,36 +307,72 @@ document.getElementById('saveSettingsBtn').addEventListener('click',()=>{
    platform has its own connect flow and its own connection record.
    No secret or base URL needed — being signed into the CRM IS the
    authorization now, checked server-side via the session cookie. */
-document.getElementById('connectFacebookBtn').addEventListener('click', ()=>{
-  if(!requireSubscriptionForAction()) return;
-  window.location.href = `${BACKEND_BASE}/api/oauth-meta`;
-});
-document.getElementById('connectInstagramBtn').addEventListener('click', ()=>{
-  if(!requireSubscriptionForAction()) return;
-  window.location.href = `${BACKEND_BASE}/api/oauth-instagram`;
-});
-document.getElementById('connectTiktokBtn').addEventListener('click', ()=>{
-  if(!requireSubscriptionForAction()) return;
-  window.location.href = `${BACKEND_BASE}/api/oauth-tiktok`;
+/* Each platform button is a single toggle: it connects when disconnected,
+   and disconnects when connected. One control per platform reads far more
+   clearly than a connect button plus a separate disconnect button. */
+const SOCIAL_BUTTONS = [
+  { key:'meta',      btn:'connectFacebookBtn',  label:'connectFacebookBtnLabel',  name:'Facebook',  connectPath:'/api/oauth-meta' },
+  { key:'instagram', btn:'connectInstagramBtn', label:'connectInstagramBtnLabel', name:'Instagram', connectPath:'/api/oauth-instagram' },
+  { key:'tiktok',    btn:'connectTiktokBtn',    label:'connectTiktokBtnLabel',    name:'TikTok',    connectPath:'/api/oauth-tiktok' }
+];
+const socialConnected = { meta:false, instagram:false, tiktok:false };
+
+SOCIAL_BUTTONS.forEach(cfg=>{
+  document.getElementById(cfg.btn).addEventListener('click', async ()=>{
+    if(!requireSubscriptionForAction()) return;
+    if(!socialConnected[cfg.key]){
+      window.location.href = `${BACKEND_BASE}${cfg.connectPath}`;
+      return;
+    }
+    const extra = cfg.key === 'instagram'
+      ? ' Instagram has no automatic revoke, so also remove Alba Business Desk from Instagram\'s own app settings if you want the permission cleared on their side too.'
+      : '';
+    if(!(await showConfirm(`Disconnect ${cfg.name}? Its stats will stop syncing. Data already pulled into your workspace stays.${extra}`,
+      { title:`Disconnect ${cfg.name}`, confirmLabel:'Disconnect', danger:true }))) return;
+    const btn = document.getElementById(cfg.btn);
+    btn.disabled = true;
+    try{
+      const res = await fetch(`${BACKEND_BASE}/api/social-sync?action=disconnect&platform=${cfg.key}`, {
+        method:'POST', credentials:'include',
+        headers:{ 'X-CSRF-Token': getCsrfToken() }
+      });
+      const data = await res.json();
+      if(!res.ok) await showAlert(data.error || `Could not disconnect ${cfg.name}.`);
+    }catch(err){
+      await showAlert('Could not reach the backend.');
+    }
+    btn.disabled = false;
+    refreshConnectionStatus();
+  });
 });
 document.getElementById('refreshConnectionStatusBtn').addEventListener('click', refreshConnectionStatus);
+
+function setSocialButtonState(cfg, connected, detail){
+  socialConnected[cfg.key] = connected;
+  const labelEl = document.getElementById(cfg.label);
+  if(labelEl) labelEl.textContent = connected ? `Disconnect ${cfg.name}` : `Continue with ${cfg.name}`;
+  const btn = document.getElementById(cfg.btn);
+  if(btn) btn.title = connected && detail ? `Connected as ${detail}` : '';
+}
 
 async function refreshConnectionStatus(){
   const el = document.getElementById('connectionStatusList');
   el.innerHTML = '<p class="topbar-sub">Checking…</p>';
   try{
-    const res = await fetch(`${BACKEND_BASE}/api/social-sync?action=status`);
+    const res = await fetch(`${BACKEND_BASE}/api/social-sync?action=status`, { credentials:'include' });
     const data = await res.json();
-    const rows = [];
-    rows.push(data.meta && data.meta.connected
-      ? `<div class="info-row"><span>Facebook</span><span style="color:var(--accent);">Connected${data.meta.pageName?' — '+escapeHtml(data.meta.pageName):''}</span></div>`
-      : `<div class="info-row"><span>Facebook</span><span style="color:var(--graphite);">Not connected</span></div>`);
-    rows.push(data.instagram && data.instagram.connected
-      ? `<div class="info-row"><span>Instagram</span><span style="color:var(--accent);">Connected${data.instagram.username?' — @'+escapeHtml(data.instagram.username):''}</span></div>`
-      : `<div class="info-row"><span>Instagram</span><span style="color:var(--graphite);">Not connected</span></div>`);
-    rows.push(data.tiktok && data.tiktok.connected
-      ? `<div class="info-row"><span>TikTok</span><span style="color:var(--accent);">Connected${data.tiktok.displayName?' — '+escapeHtml(data.tiktok.displayName):''}</span></div>`
-      : `<div class="info-row"><span>TikTok</span><span style="color:var(--graphite);">Not connected</span></div>`);
+    const details = {
+      meta: (data.meta && data.meta.pageName) || '',
+      instagram: (data.instagram && data.instagram.username) ? '@'+data.instagram.username : '',
+      tiktok: (data.tiktok && data.tiktok.displayName) || ''
+    };
+    const rows = SOCIAL_BUTTONS.map(cfg=>{
+      const connected = !!(data[cfg.key] && data[cfg.key].connected);
+      setSocialButtonState(cfg, connected, details[cfg.key]);
+      return connected
+        ? `<div class="info-row"><span>${cfg.name}</span><span style="color:var(--accent);">Connected${details[cfg.key]?' — '+escapeHtml(details[cfg.key]):''}</span></div>`
+        : `<div class="info-row"><span>${cfg.name}</span><span style="color:var(--graphite);">Not connected</span></div>`;
+    });
     el.innerHTML = rows.join('') + (data.note ? `<p class="topbar-sub" style="margin-top:8px;">${escapeHtml(data.note)}</p>` : '');
   }catch(err){
     el.innerHTML = '<p class="topbar-sub">Could not reach the backend right now.</p>';

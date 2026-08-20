@@ -1,9 +1,14 @@
 // Social tab.
 
 /* ---------- Social ---------- */
+// Only the three platforms with real, working sync integrations are
+// offered. Colours for previously-removed platforms are kept so any
+// workspace that already has one saved still renders sensibly rather than
+// falling back to grey — platformColor() also has a safe default.
 const PLATFORM_COLORS = {
-  'Instagram':'#E1306C','Facebook':'#1877F2','X (Twitter)':'#000000','LinkedIn':'#0A66C2',
-  'TikTok':'#000000','YouTube':'#FF0000','Pinterest':'#E60023','Threads':'#000000','Other':'#6E6E73'
+  'Instagram':'#E1306C','Facebook':'#1877F2','TikTok':'#000000',
+  'X (Twitter)':'#000000','LinkedIn':'#0A66C2',
+  'YouTube':'#FF0000','Pinterest':'#E60023','Threads':'#000000','Other':'#6E6E73'
 };
 function platformById(id){ return DATA.socialPlatforms.find(p=>p.id===id); }
 function platformColor(name){ return PLATFORM_COLORS[name] || '#6E6E73'; }

@@ -9,11 +9,11 @@
 // subscription, same as any other real functionality in the CRM.
 
 const { setCors } = require('../lib/util');
-const { getConnection } = require('../lib/tokenStore');
+const { getConnection, deleteConnection } = require('../lib/tokenStore');
 const { getDb } = require('../lib/firebaseAdmin');
 const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformFetchers');
 const { checkRateLimit } = require('../lib/rateLimit');
-const { clientIp } = require('../lib/auditLog');
+const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
 
@@ -68,6 +68,53 @@ async function handlePlatformSync(req, res){
   }catch(err){
     console.error(`Sync failed for uid=${decoded.uid} platform=${req.query.platform}:`, err.message, err.stack ? '\n'+err.stack : '');
     return res.status(502).json({ error: err.message });
+  }
+}
+
+// Disconnect a connected social platform. Where the provider supports
+// programmatic revocation we ask them to revoke too, so access genuinely
+// ends rather than us simply forgetting the token.
+async function handleDisconnect(req, res){
+  if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  let decoded;
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+
+  const platform = req.query.platform;
+  if(!['meta','instagram','tiktok'].includes(platform)){
+    return res.status(400).json({ error: 'Unknown platform.' });
+  }
+  try{
+    const conn = await getConnection(decoded.uid, platform);
+    if(conn){
+      try{
+        if(platform === 'meta' && conn.pageAccessToken){
+          // Graph API: DELETE /me/permissions revokes the whole grant.
+          await fetch(`https://graph.facebook.com/v22.0/me/permissions?access_token=${encodeURIComponent(conn.pageAccessToken)}`, { method:'DELETE' });
+        } else if(platform === 'tiktok' && conn.refreshToken){
+          await fetch('https://open.tiktokapis.com/v2/oauth/revoke/', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_key: process.env.TIKTOK_CLIENT_KEY || '',
+              client_secret: process.env.TIKTOK_CLIENT_SECRET || '',
+              token: conn.refreshToken
+            })
+          });
+        }
+        // Instagram's Business Login has no documented programmatic revoke
+        // endpoint — the user revokes from Instagram's own app settings.
+        // Deleting our stored token still ends our access immediately.
+      }catch(e){
+        console.error(`Revoke call failed for ${platform} (continuing to delete locally):`, e.message);
+      }
+    }
+    await deleteConnection(decoded.uid, platform);
+    await logEvent(`${platform}_disconnected`, { uid: decoded.uid });
+    return res.status(200).json({ ok: true });
+  }catch(err){
+    console.error(err);
+    return res.status(500).json({ error: 'Could not disconnect.' });
   }
 }
 
@@ -147,6 +194,7 @@ module.exports = async (req, res) => {
   setCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if(req.query.action === 'status') return handleStatus(req, res);
+  if(req.query.action === 'disconnect') return handleDisconnect(req, res);
   if(req.query.action === 'scheduled') return handleScheduled(req, res);
   if(req.query.platform) return handlePlatformSync(req, res);
   return res.status(400).json({ error: 'Specify ?platform=instagram|facebook|tiktok or ?action=status|scheduled' });
