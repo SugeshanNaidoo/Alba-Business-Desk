@@ -30,12 +30,14 @@ async function refreshGcalStatus(){
     if(data.connected){
       textEl.textContent = `Connected${data.calendarEmail ? ' — '+data.calendarEmail : ''}`;
       btnLabel.textContent = 'Reconnect Google Calendar';
+      document.getElementById('disconnectGoogleCalendarBtn').style.display = 'inline-flex';
       hint.textContent = 'Connected. Click any day to see, add, or edit its events.';
       eventsPanel.style.display = 'block';
       loadCalendarEvents();
     } else {
       textEl.textContent = 'Not connected';
       btnLabel.textContent = 'Connect Google Calendar';
+      document.getElementById('disconnectGoogleCalendarBtn').style.display = 'none';
       hint.textContent = 'Connect your calendar to see, create, and manage events right here.';
       eventsPanel.style.display = 'none';
     }
@@ -292,4 +294,20 @@ document.getElementById('deleteCalendarEventBtn').addEventListener('click', asyn
   }catch(err){
     await showAlert('Could not reach the calendar backend.');
   }
+});
+
+document.getElementById('disconnectGoogleCalendarBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Disconnect Google Calendar? Events already in your calendar stay there, but Alba Business Desk will no longer be able to read or manage them.', { title:'Disconnect Google Calendar', confirmLabel:'Disconnect', danger:true }))) return;
+  try{
+    const res = await fetch(`${BACKEND_BASE}/api/calendar?action=disconnect`, {
+      method:'POST', credentials:'include',
+      headers:{ 'X-CSRF-Token': getCsrfToken() }
+    });
+    const data = await res.json();
+    if(!res.ok){ await showAlert(data.error || 'Could not disconnect.'); return; }
+  }catch(err){
+    await showAlert('Could not reach the calendar backend.');
+    return;
+  }
+  refreshGcalStatus();
 });

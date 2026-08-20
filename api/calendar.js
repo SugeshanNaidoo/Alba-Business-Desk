@@ -14,7 +14,7 @@
 //   {APP_BASE_URL}/api/calendar?action=connect
 
 const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
-const { setConnection, getConnection } = require('../lib/tokenStore');
+const { setConnection, getConnection, deleteConnection } = require('../lib/tokenStore');
 const { verifySession } = require('../lib/session');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
@@ -41,9 +41,12 @@ async function handleConnectStart(req, res){
     return res.status(500).send('GOOGLE_CALENDAR_CLIENT_ID and APP_BASE_URL must be set on the server first.');
   }
   const redirectUri = `${baseUrl}/api/calendar?action=connect`;
+  // Minimum scopes for what the Calendar tab actually does. calendar.events
+  // covers reading, creating, updating and deleting events; userinfo.email
+  // is only so the UI can show which account is linked. Deliberately NOT
+  // requesting full 'calendar' or 'userinfo.profile'.
   const scope = [
     'https://www.googleapis.com/auth/calendar.events',
-    'https://www.googleapis.com/auth/calendar.freebusy',
     'https://www.googleapis.com/auth/userinfo.email'
   ].join(' ');
   const state = crypto.randomBytes(16).toString('hex');
@@ -128,6 +131,37 @@ async function handleStatus(req, res){
     return res.status(200).json(conn ? { connected: true, calendarEmail: conn.calendarEmail || '' } : { connected: false });
   }catch(err){
     return res.status(200).json({ connected: false, note: 'Could not reach Firestore.' });
+  }
+}
+
+/* ---------- Disconnect ---------- */
+async function handleDisconnect(req, res){
+  if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  let decoded;
+  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+
+  try{
+    const conn = await getConnection(decoded.uid, 'google_calendar');
+    // Best effort: tell Google to revoke the grant as well, so access ends
+    // on their side too rather than us simply forgetting the token.
+    if(conn && conn.refreshToken){
+      try{
+        await fetch('https://oauth2.googleapis.com/revoke', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ token: conn.refreshToken })
+        });
+      }catch(e){
+        console.error('Google token revoke failed (continuing to delete locally):', e.message);
+      }
+    }
+    await deleteConnection(decoded.uid, 'google_calendar');
+    await logEvent('google_calendar_disconnected', { uid: decoded.uid });
+    return res.status(200).json({ ok: true });
+  }catch(err){
+    console.error(err);
+    return res.status(500).json({ error: 'Could not disconnect Google Calendar.' });
   }
 }
 
@@ -260,6 +294,7 @@ module.exports = async (req, res) => {
     return handleConnectStart(req, res);
   }
   if(action === 'status') return handleStatus(req, res);
+  if(action === 'disconnect') return handleDisconnect(req, res);
   if(action === 'list-events') return handleListEvents(req, res);
   if(action === 'create-event') return handleCreateEvent(req, res);
   if(action === 'update-event') return handleUpdateEvent(req, res);

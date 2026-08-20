@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google API Disclosure — Alba Business Desk</title>
+<script>
+(function(){
+  try{
+    var saved = localStorage.getItem('flowline_theme');
+    var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  }catch(e){}
+})();
+</script>
+<link rel="stylesheet" href="policy.css?v=1787220204">
+</head>
+<body>
+  <header class="policy-header">
+    <a href="index.html" class="policy-brand">
+      <img id="policyLogo" class="policy-logo" alt="Alba Business Desk">
+    </a>
+    <div class="policy-header-right">
+      <div class="policy-theme-toggle">
+        <button class="policy-theme-btn" data-theme-choice="light" aria-label="Light mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="policy-theme-btn" data-theme-choice="dark" aria-label="Dark mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.2 14.6A8.6 8.6 0 019.4 3.8a7.1 7.1 0 1010.8 10.8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="policy-wrap">
+    <h1>Google API Disclosure</h1>
+    <div class="policy-meta">
+      Last updated: <strong>6 August 2026</strong> · Applies to the Google Calendar integration in
+      the Alba Business Desk CRM tool
+    </div>
+
+    <div class="policy-callout">
+      Alba Business Desk's use and transfer of information received from Google APIs to any other
+      app will adhere to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google
+      API Services User Data Policy</a>, including the Limited Use requirements.
+    </div>
+
+    <p>
+      This page explains how Alba Business Desk (the "Service") accesses, uses, stores, and shares
+      Google user data when you connect Google Calendar. It supplements our
+      <a href="privacy-policy.html">Privacy Policy</a>.
+    </p>
+
+    <h2 id="what-we-are">1. What Alba Business Desk is</h2>
+    <p>
+      Alba Business Desk is a customer relationship management tool for South African businesses —
+      contacts, companies, deals, tasks, calendar, and reporting in one workspace. It is a product
+      of <strong>Alba Designs</strong> (registration number <strong>2020/636646/07</strong>).
+      The Google integration is an optional Calendar feature: you connect your own Google account
+      so you can see and manage your calendar from inside the CRM instead of switching between
+      two tools.
+    </p>
+    <p>
+      Application home page: <a href="index.html">Alba Business Desk</a><br>
+      App name on the Google Cloud OAuth consent screen: <strong>Alba Business Desk</strong>
+    </p>
+
+    <h2 id="scopes">2. Google APIs and OAuth scopes we request</h2>
+    <p>When you choose to connect Google Calendar, Alba Business Desk requests these OAuth scopes:</p>
+    <table class="policy-table">
+      <tr><th>Scope</th><th>Why we request it</th></tr>
+      <tr>
+        <td><code>https://www.googleapis.com/auth/calendar.events</code></td>
+        <td>Read your upcoming events so the Calendar tab can display them, and create, update, or delete events you manage from within the CRM.</td>
+      </tr>
+      <tr>
+        <td><code>https://www.googleapis.com/auth/userinfo.email</code></td>
+        <td>Read the email address of the Google account you connect, purely so the CRM can show you which account is linked.</td>
+      </tr>
+    </table>
+    <p>
+      We request only these two scopes. We deliberately do <strong>not</strong> request the full
+      <code>calendar</code> scope (which would grant access to calendar settings and calendar
+      management beyond events), and we do not request <code>userinfo.profile</code>. Connecting
+      Google is entirely optional — every other part of Alba Business Desk works without it.
+    </p>
+    <p>
+      Signing in to Alba Business Desk also uses Google Sign-In, through Firebase Authentication.
+      That is a separate mechanism from this integration: it confirms who you are and gives us your
+      name, email address, and profile photo, but grants no access to your calendar. Connecting
+      Google Calendar is a distinct, deliberate second step.
+    </p>
+
+    <h2 id="how-we-use">3. How we use Google user data</h2>
+    <p>We use Google user data solely to provide these user-facing Calendar features:</p>
+    <ul>
+      <li><strong>Viewing your calendar</strong> — reading events in the date range you're looking at, so the month grid in the Calendar tab shows what's actually scheduled.</li>
+      <li><strong>Creating events</strong> — adding an event to your calendar when you create one in the CRM.</li>
+      <li><strong>Updating and deleting events</strong> — changing or removing an event when you edit or delete it in the CRM.</li>
+      <li><strong>Google Meet links (optional)</strong> — when you tick the Meet option on an event, creating a Meet conference link on that calendar event.</li>
+      <li><strong>Account label</strong> — storing and displaying the connected account's email so you can confirm which calendar is linked.</li>
+    </ul>
+    <p>
+      These uses are limited to providing prominent, user-facing features in the CRM's Calendar
+      tab. We do not use Google user data for advertising, credit scoring, personalised ads, or
+      any analytics unrelated to operating this integration. We do not use it to train machine
+      learning or AI models.
+    </p>
+
+    <h2 id="what-we-store">4. What Google user data we access and store</h2>
+    <ul>
+      <li><strong>OAuth refresh token</strong> — for the connected account, so the integration keeps working without asking you to sign in repeatedly.</li>
+      <li><strong>Account email</strong> — the Google account email returned by <code>userinfo.email</code>.</li>
+      <li><strong>Calendar identifier</strong> — which calendar we sync to (your primary calendar).</li>
+      <li><strong>Event fields we write</strong> — titles, start and end times, descriptions, attendee email addresses, and Meet conference data for events you create or edit through the CRM.</li>
+    </ul>
+    <p>
+      Event data we <em>read</em> for display is fetched live from Google each time you open the
+      Calendar tab and rendered in your browser — we do not keep a copy of your calendar in our
+      database.
+    </p>
+    <p>
+      We do not sell Google user data. We do not use it to serve advertisements. We do not allow
+      humans to read it except: with your explicit consent for support; where necessary for
+      security investigations such as abuse; where required by law; or where the data has been
+      aggregated and no longer identifies you.
+    </p>
+
+    <h2 id="sharing">5. Sharing and transfers</h2>
+    <p>
+      We do not transfer Google user data to third parties except as allowed under the Google API
+      Services User Data Policy Limited Use requirements, for example:
+    </p>
+    <ul>
+      <li>To provide the Calendar features described above, including writing events back to Google Calendar and Meet through Google's own APIs.</li>
+      <li>For security purposes, such as investigating abuse or protecting accounts.</li>
+      <li>To comply with applicable law.</li>
+      <li>As part of a merger, acquisition, or sale of assets, and then only with explicit prior user consent where Google's policy requires it.</li>
+    </ul>
+    <p>
+      Infrastructure providers that host Alba Business Desk — Google Cloud / Firebase for the
+      database, and Vercel for the application and its backend functions — process protected
+      application data as part of operating the Service. They are not granted independent rights
+      to use Google user data for their own purposes.
+    </p>
+
+    <h2 id="security">6. Storage and security</h2>
+    <ul>
+      <li>OAuth tokens are stored in our production database, in a per-account record that is <strong>backend-only</strong>: database security rules block all client access to it, so it can never be read from a browser, including by you.</li>
+      <li>Every calendar request requires a valid signed-in session, verified server-side. Session cookies are HttpOnly and Secure, and every state-changing request additionally requires a CSRF token.</li>
+      <li>All traffic uses HTTPS.</li>
+      <li>Each customer's Google connection is isolated to their own account — connections are never shared across accounts on the platform.</li>
+    </ul>
+
+    <h2 id="retention">7. Retention</h2>
+    <ul>
+      <li><strong>While connected</strong> — the refresh token and calendar link metadata are kept so the integration keeps working.</li>
+      <li><strong>After you disconnect</strong> — we ask Google to revoke the token, then delete the stored connection record.</li>
+      <li><strong>If you delete your account</strong> — the Google connection is deleted along with the rest of your data, as described in our <a href="privacy-policy.html">Privacy Policy</a>.</li>
+      <li><strong>Events already in your Google Calendar</strong> stay in your calendar. Disconnecting stops our access; it does not delete your calendar entries.</li>
+    </ul>
+
+    <h2 id="connect">8. How to connect and disconnect</h2>
+    <ol>
+      <li>Sign in to Alba Business Desk and open the <strong>Calendar</strong> tab.</li>
+      <li>Choose <strong>Connect Google Calendar</strong> and complete Google's consent screen.</li>
+      <li>To disconnect later, use <strong>Disconnect Google Calendar</strong> on the same Calendar tab. You can also revoke access at any time directly from your Google Account's permissions page at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
+    </ol>
+
+    <h2 id="limited-use">9. Limited Use affirmation</h2>
+    <p>
+      Alba Business Desk's use of information received from Google APIs complies with the Google
+      API Services User Data Policy, including the Limited Use requirements:
+    </p>
+    <ul>
+      <li>We limit use to providing user-facing features that are prominent in our interface.</li>
+      <li>We do not transfer Google user data except as Limited Use allows.</li>
+      <li>We do not use Google user data for serving advertisements.</li>
+      <li>We do not allow humans to read the data except under the narrow exceptions Google permits — your consent, security investigations, legal compliance, or aggregated non-identifying data.</li>
+    </ul>
+
+    <h2 id="related">10. Related policies</h2>
+    <ul>
+      <li><a href="privacy-policy.html">Privacy Policy</a></li>
+      <li><a href="terms-of-service.html">Terms of Service</a></li>
+      <li><a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a></li>
+    </ul>
+
+    <h2 id="contact">11. Contact</h2>
+    <p>
+      Questions about this disclosure or our Google data practices:<br>
+      <strong>Sugeshan Naidoo</strong>, Information Officer<br>
+      Email: <a href="mailto:albawagdesigns@gmail.com">albawagdesigns@gmail.com</a><br>
+      Phone: <a href="tel:+27676487325">+27 67 648 7325</a><br>
+      Alba Designs, registration number 2020/636646/07<br>
+      Suite 4, Alba House, 128 Overport Drive, Berea, Durban, 4091, South Africa
+    </p>
+  </main>
+
+  <footer class="policy-footer">
+    Alba Business Desk, a product of Alba Designs ·
+    <a href="privacy-policy.html">Privacy Policy</a> ·
+    <a href="terms-of-service.html">Terms of Service</a> ·
+    <a href="refund-policy.html">Refund Policy</a> ·
+    <a href="cookie-policy.html">Cookie Policy</a> ·
+    <a href="acceptable-use.html">Acceptable Use</a> ·
+    <a href="disclaimer.html">Disclaimer</a> ·
+    <a href="google-api-disclosure.html">Google API Disclosure</a> ·
+    <a href="paia-manual.html">PAIA Manual</a>
+  </footer>
+  <script src="policy.js?v=1787220204"></script>
+</body>
+</html>
