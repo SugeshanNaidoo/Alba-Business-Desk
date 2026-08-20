@@ -14,6 +14,7 @@ function renderSettings(){
   document.getElementById('settingsWorkspaceName').value = DATA.settings.workspaceName;
   refreshConnectionStatus();
   refreshWhatsappSettingsStatus();
+  renderMigrationStatus();
   renderStatusEditor();
   renderSourceEditor();
   renderCustomFieldEditor('contact');
@@ -549,3 +550,57 @@ document.getElementById('importContactsCsvFile').addEventListener('change', asyn
   reader.readAsText(file);
 });
 
+
+
+/* ---- Workspace upgrade (entity migration) --------------------------------
+   Owner-only, enforced server-side. Runs each entity to completion in
+   chunks; the backend holds a lock so a second click cannot start a
+   competing run. */
+function renderMigrationStatus(){
+  const el = document.getElementById('migrationStatusList');
+  if(!el) return;
+  if(!ORG_CONTEXT || !ORG_CONTEXT.migration){
+    el.innerHTML = '<p class="topbar-sub">Sign in to see upgrade status.</p>';
+    return;
+  }
+  const labels = { contacts:'Contacts', companies:'Companies', deals:'Deals',
+    tasks:'Tasks', activities:'Activity', calendarEvents:'Calendar',
+    socialAccounts:'Social', whatsapp:'WhatsApp', files:'Files', auditLogs:'Audit log' };
+  el.innerHTML = Object.entries(labels).map(([k,label])=>{
+    const mode = entityMode(k);
+    const text = mode==='v2' ? 'Upgraded' : mode==='in_progress' ? 'In progress…' : 'Not yet upgraded';
+    const colour = mode==='v2' ? 'var(--accent)' : mode==='in_progress' ? 'var(--gold)' : 'var(--graphite)';
+    return `<div class="info-row"><span>${label}</span><span style="color:${colour};">${text}</span></div>`;
+  }).join('');
+}
+
+document.getElementById('runMigrationBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
+  if(!ORG_CONTEXT){ await showAlert('Your workspace is still loading — try again in a moment.'); return; }
+  if(!(await showConfirm('Upgrade this workspace to per-record storage? Your existing data is copied, not moved, and the previous copy is kept.', { title:'Upgrade workspace', confirmLabel:'Upgrade' }))) return;
+
+  const btn = document.getElementById('runMigrationBtn');
+  const prog = document.getElementById('migrationProgress');
+  btn.disabled = true; btn.textContent = 'Upgrading…';
+  prog.style.display = 'block'; prog.textContent = 'Starting…';
+
+  const result = await runPendingMigrations((entity, data)=>{
+    prog.textContent = data.total
+      ? `${entity}: ${data.cursor || 0} of ${data.total}…`
+      : `${entity}: working…`;
+  });
+
+  btn.disabled = false; btn.textContent = 'Upgrade workspace';
+  if(result.ok){
+    const failed = Object.entries(result.summary).filter(([,v]) => String(v).startsWith('failed'));
+    prog.textContent = failed.length
+      ? `Finished with errors: ${failed.map(([k,v])=>k+' ('+v+')').join(', ')}`
+      : 'Upgrade complete.';
+    // Reload from the new authoritative source before re-rendering.
+    await hydrateMigratedEntities();
+    renderAll();
+  }else{
+    prog.textContent = 'Could not start the upgrade.';
+  }
+  renderMigrationStatus();
+});

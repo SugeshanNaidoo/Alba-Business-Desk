@@ -7,13 +7,13 @@
 <script>
 (function(){
   try{
-    var saved = localStorage.getItem('flowline_theme');
+    var saved = localStorage.getItem('albabusinessdesk_theme') || localStorage.getItem('flowline_theme');
     var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787223003">
+<link rel="stylesheet" href="policy.css?v=1787239977">
 </head>
 <body>
   <header class="policy-header">
@@ -64,6 +64,7 @@
       <li>Subscriber records: account details from Google Sign-In, subscription status, connected-integration credentials (Instagram, Facebook, TikTok, Google Calendar, WhatsApp), support correspondence</li>
       <li>Billing records: PayFast payment references, amounts, dates, and statements</li>
       <li>Communication records: WhatsApp message history exchanged through a subscriber's connected number, where WhatsApp is connected</li>
+      <li>Workspace records: organisation details, membership records (user ID, email, display name, role, status, and removal history where applicable)</li>
       <li>Platform records: security audit logs of account and billing events, IP addresses, and timestamps</li>
       <li>Financial and tax records</li>
       <li>Records held under other legislation, including the Companies Act, Tax Administration Act, ECTA, and POPIA</li>
@@ -108,6 +109,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787223003"></script>
+  <script src="policy.js?v=1787239977"></script>
 </body>
 </html>

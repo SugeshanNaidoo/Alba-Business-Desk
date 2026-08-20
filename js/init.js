@@ -15,6 +15,12 @@ function renderAll(){
   renderSettings();
   renderNotifications();
 }
+/* First paint runs immediately from localStorage so the UI is never blank.
+   Organisation context resolves asynchronously in handleAuthChange(), which
+   calls pullCloudData() -> renderAll() again once it is known. Because every
+   entity is 'legacy' in Phase 2, this first render is already correct; the
+   ordering only starts to matter in Phase 4, when a re-render is required
+   after v2 entities hydrate. */
 renderAll();
 
 /* Safety net: handleAuthChange normally hides this within moments of page

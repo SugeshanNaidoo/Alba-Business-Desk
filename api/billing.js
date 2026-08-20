@@ -185,6 +185,9 @@ async function handleDeleteAccount(req, res){
     await logEvent('account_deleted', { uid, ip });
     await deleteCollection(db, subRef.collection('payments'));
     await subRef.delete().catch(()=>{});
+    // Both collection names — the account must be fully erased regardless of
+    // whether this user's workspace has been copied forward yet.
+    await db.collection('albabusinessdesk_crm_users').doc(uid).delete().catch(()=>{});
     await db.collection('flowline_crm_users').doc(uid).delete().catch(()=>{});
     // Connections are per-customer now — clean up this account's own, not
     // a shared workspace-wide set that belongs to anyone else.

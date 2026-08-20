@@ -11,7 +11,33 @@
 // 'https://your-backend.vercel.app' (no trailing slash).
 const BACKEND_BASE = '';
 
-const DB_KEY = 'flowline_crm_data_v1';
+const DB_KEY = 'albabusinessdesk_crm_data_v1';
+const LEGACY_DB_KEY = 'flowline_crm_data_v1';       // pre-rename local cache
+const THEME_KEY = 'albabusinessdesk_theme';
+const LEGACY_THEME_KEY = 'flowline_theme';          // pre-rename theme key
+
+/* Firestore collection holding the legacy monolithic workspace document.
+   Both names exist because renaming a collection does not move data — the
+   backend copies each user forward on bootstrap, and the client falls back
+   to the old name if that copy has not happened yet. */
+const WORKSPACE_COLLECTION = 'albabusinessdesk_crm_users';
+const LEGACY_WORKSPACE_COLLECTION = 'flowline_crm_users';
+
+/* One-time local cache migration. Losing localStorage is survivable (the
+   cloud copy is authoritative), but carrying it across avoids a pointless
+   full re-sync and a flash of default data on first load after the rename. */
+(function migrateLocalKeys(){
+  try{
+    if(!localStorage.getItem(DB_KEY)){
+      const old = localStorage.getItem(LEGACY_DB_KEY);
+      if(old) localStorage.setItem(DB_KEY, old);
+    }
+    if(!localStorage.getItem(THEME_KEY)){
+      const oldTheme = localStorage.getItem(LEGACY_THEME_KEY);
+      if(oldTheme) localStorage.setItem(THEME_KEY, oldTheme);
+    }
+  }catch(e){ /* private browsing — non-fatal */ }
+})();
 
 /* ---------- Dialogs (replace native alert/confirm/prompt) ---------- */
 let _dialogResolve = null;
@@ -253,7 +279,14 @@ function saveData(d){
   localStorage.setItem(DB_KEY, JSON.stringify(d));
   if(cloudUser && cloudDb){
     clearTimeout(cloudSaveTimer);
-    cloudSaveTimer = setTimeout(pushCloudData, 600);
+    cloudSaveTimer = setTimeout(()=>{
+      // Legacy entities go to the monolithic payload (migrated keys are
+      // stripped inside pushCloudData). Migrated entities are diffed into
+      // their own subcollections. Both are no-ops when there is nothing of
+      // that kind to write, so this is safe in every migration state.
+      pushCloudData();
+      if(typeof syncMigratedEntities === 'function') syncMigratedEntities();
+    }, 600);
   }
 }
 let DATA = loadData();
@@ -445,7 +478,7 @@ document.querySelectorAll('.richtext-toolbar').forEach(wireRichTextToolbar);
 /* ---------- Theme ---------- */
 function setTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
-  try{ localStorage.setItem('flowline_theme', theme); }catch(e){}
+  try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
   document.querySelectorAll('.theme-toggle-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.themeChoice===theme);
   });

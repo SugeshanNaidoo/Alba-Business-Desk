@@ -7,13 +7,13 @@
 <script>
 (function(){
   try{
-    var saved = localStorage.getItem('flowline_theme');
+    var saved = localStorage.getItem('albabusinessdesk_theme') || localStorage.getItem('flowline_theme');
     var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787223003">
+<link rel="stylesheet" href="policy.css?v=1787239977">
 </head>
 <body>
   <header class="policy-header">
@@ -46,7 +46,8 @@
     <h2 id="agree-not-to">1. You agree not to</h2>
     <ul>
       <li>Break any applicable law, including data protection law regarding the information you enter about your own contacts.</li>
-      <li>Attempt to gain unauthorized access to another account or to the underlying systems.</li>
+      <li>Attempt to gain unauthorized access to another account, another organisation's workspace, or to the underlying systems.</li>
+      <li>Attempt to circumvent workspace roles or permissions, or to grant yourself access or entitlements you have not been given.</li>
       <li>Abuse, overload, or attempt to circumvent rate limits or security controls on the service.</li>
       <li>Use the service, including the WhatsApp integration, to send unsolicited bulk communications.</li>
       <li>Use the WhatsApp integration in a way that violates Meta's WhatsApp Business Policy — including messaging people who haven't opted in to hear from you.</li>
@@ -96,6 +97,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787223003"></script>
+  <script src="policy.js?v=1787239977"></script>
 </body>
 </html>

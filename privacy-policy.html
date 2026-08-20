@@ -7,13 +7,13 @@
 <script>
 (function(){
   try{
-    var saved = localStorage.getItem('flowline_theme');
+    var saved = localStorage.getItem('albabusinessdesk_theme') || localStorage.getItem('flowline_theme');
     var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787223003">
+<link rel="stylesheet" href="policy.css?v=1787239977">
 </head>
 <body>
   <header class="policy-header">
@@ -46,6 +46,22 @@
       described here. This policy explains how we collect, use, store, and protect personal
       information when you use Alba Business Desk, in line with the Protection of Personal
       Information Act 4 of 2013 ("POPIA").
+    </p>
+
+    <h2 id="workspaces">1a. Workspaces and organisations</h2>
+    <p>
+      Your data is held in a <strong>workspace</strong> (an "organisation")
+      rather than being tied to your personal login alone. This is what allows
+      a business to have more than one person working in the same CRM in
+      future. Access to a workspace is controlled by a membership record with
+      a role — owner, admin, member, or viewer — and is enforced at the
+      database level, not merely hidden in the interface.
+    </p>
+    <p>
+      If a member is removed from a workspace, their access ends immediately.
+      We keep a record that they were a member and when they were removed, so
+      the workspace owner has an accurate history of who had access — we do
+      not silently erase that.
     </p>
 
     <h2 id="who-we-are">1. Who we are, and in what capacity</h2>
@@ -98,6 +114,13 @@
       through any public or unauthenticated channel, and only ever readable by your own signed-in
       account.
     </p>
+    <h3>Workspace membership records</h3>
+    <p>
+      For each workspace you belong to we store your user ID, email address,
+      display name, role, and whether your membership is active — this is what
+      determines what you are permitted to see and do.
+    </p>
+
     <h3>Technical and security information</h3>
     <p>
       We log IP addresses and timestamps for security purposes: to detect abuse, enforce rate
@@ -155,6 +178,7 @@
       <li>Cancel any active subscription first, so you're never charged again;</li>
       <li>Delete your CRM data, payment history, and sign-in record;</li>
       <li>Delete your connected social media, calendar, and WhatsApp credentials, and all stored WhatsApp message history;</li>
+      <li>Delete your workspace records — contacts, companies, deals, tasks and activity — and both the current and the previous copy of your workspace storage;</li>
       <li>Retain a limited security audit log entry — that an account existed and was deleted, with a timestamp — for a reasonable period afterward, for fraud prevention and legal compliance.</li>
     </ol>
     <p>
@@ -236,6 +260,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787223003"></script>
+  <script src="policy.js?v=1787239977"></script>
 </body>
 </html>

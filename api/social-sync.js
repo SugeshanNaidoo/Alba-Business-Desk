@@ -10,6 +10,7 @@
 
 const { setCors } = require('../lib/util');
 const { getConnection, deleteConnection } = require('../lib/tokenStore');
+const { WORKSPACE_COLLECTION, readWorkspaceDoc } = require('../lib/orgContext');
 const { getDb } = require('../lib/firebaseAdmin');
 const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformFetchers');
 const { checkRateLimit } = require('../lib/rateLimit');
@@ -158,8 +159,10 @@ async function handleScheduled(req, res){
     for(const subDoc of activeSubs.docs){
       const uid = subDoc.id;
       try{
-        const docRef = db.collection('flowline_crm_users').doc(uid);
-        const doc = await docRef.get();
+        // Read via the dual-name helper so the nightly sync keeps working
+        // for users whose workspace has not been copied forward yet.
+        const docRef = db.collection(WORKSPACE_COLLECTION).doc(uid);
+        const { snap: doc } = await readWorkspaceDoc(db, uid);
         if(!doc.exists || !doc.data().payload){
           results.push({ uid, skipped: true, reason: 'No CRM data yet' });
           continue;

@@ -67,7 +67,9 @@ function showSignedIn(user){
 
   document.getElementById('billingSignedOutNote').style.display = 'none';
   document.getElementById('billingSignedInView').style.display = 'block';
-  establishBackendSession().then(refreshBilling);
+  // The session is established by handleAuthChange() before org context is
+  // resolved — calling it here too would race two concurrent session-cookie
+  // writes for the same sign-in. Billing status is refreshed there instead.
 }
 function showSignedOut(){
   document.getElementById('loginGate').classList.add('active');
@@ -305,8 +307,21 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
 let hasWarnedAboutBlockedSave = false;
 function pushCloudData(){
   if(!cloudUser || !cloudDb) return;
-  cloudDb.collection('flowline_crm_users').doc(cloudUser.uid).set({
-    payload: JSON.stringify(DATA), updatedAt: Date.now()
+  // Entities that have migrated to their own subcollections are STRIPPED
+  // from the legacy payload before it is written. This is what makes it
+  // impossible for legacy persistence to resurrect a stale copy of migrated
+  // data: the legacy document simply never contains it.
+  //
+  // In Phase 2 every entity is 'legacy', so this removes nothing and the
+  // payload is byte-identical to what was written before.
+  const payload = { ...DATA };
+  const stripped = (typeof migratedPayloadKeys === 'function') ? migratedPayloadKeys() : [];
+  stripped.forEach(k => { delete payload[k]; });
+
+  cloudDb.collection(WORKSPACE_COLLECTION).doc(cloudUser.uid).set({
+    payload: JSON.stringify(payload),
+    migratedKeys: stripped,   // diagnostic: what this document no longer owns
+    updatedAt: Date.now()
   }).then(()=>{
     const el = document.getElementById('cloudSyncStatus');
     if(el) el.textContent = 'Synced to the cloud.';
@@ -326,10 +341,31 @@ function pushCloudData(){
 }
 function pullCloudData(){
   const el = document.getElementById('cloudSyncStatus');
-  cloudDb.collection('flowline_crm_users').doc(cloudUser.uid).get().then(doc=>{
+  // Returns the promise chain so the caller can sequence hydration after it.
+  /* Read the new collection, falling back to the pre-rename one.
+     WHY THIS FALLBACK IS ESSENTIAL: the backend copies each workspace
+     forward during bootstrap, but if that call failed (offline, backend
+     down), the new document will not exist yet. Without this fallback the
+     code below would treat an existing customer as a brand-new user and
+     reset them to defaultData() — silently destroying their workspace. */
+  return cloudDb.collection(WORKSPACE_COLLECTION).doc(cloudUser.uid).get()
+    .then(doc => (doc.exists && doc.data().payload)
+      ? doc
+      : cloudDb.collection(LEGACY_WORKSPACE_COLLECTION).doc(cloudUser.uid).get())
+    .then(doc=>{
     if(doc.exists && doc.data().payload){
       try{
-        DATA = migrateData(JSON.parse(doc.data().payload));
+        const incoming = migrateData(JSON.parse(doc.data().payload));
+        // Apply ONLY the keys the legacy payload still owns. A migrated
+        // entity is authoritative in its subcollection, so even if an older
+        // client wrote a stale copy into the payload, it is ignored here.
+        const ignore = (typeof migratedPayloadKeys === 'function') ? migratedPayloadKeys() : [];
+        if(ignore.length){
+          ignore.forEach(k => { delete incoming[k]; });
+          DATA = Object.assign({}, DATA, incoming);   // keep already-hydrated v2 keys
+        } else {
+          DATA = incoming;                            // Phase 2 path: unchanged behaviour
+        }
         saveData(DATA);
         renderAll();
       }catch(e){ console.error(e); }
@@ -349,11 +385,28 @@ function pullCloudData(){
     if(el) el.textContent = 'Could not reach the cloud — working from this device only.';
   });
 }
-function handleAuthChange(user){
-  document.getElementById('authLoadingOverlay').classList.remove('active');
+async function handleAuthChange(user){
   cloudUser = user || null;
-  if(cloudUser){ showSignedIn(cloudUser); pullCloudData(); }
-  else { showSignedOut(); }
+  if(cloudUser){
+    showSignedIn(cloudUser);
+    // The backend session cookie must exist before the organisation
+    // endpoint can authenticate us, and the organisation context must be
+    // known before workspace data loads — otherwise pullCloudData() cannot
+    // tell which entities the legacy payload still owns.
+    await establishBackendSession();
+    await initOrgContext();
+    document.getElementById('authLoadingOverlay').classList.remove('active');
+    // Legacy payload first (it still owns any un-migrated entity), then
+    // overlay the migrated entities from their own subcollections — those
+    // are authoritative and must win.
+    await pullCloudData();
+    await hydrateMigratedEntities();
+    renderAll();
+    refreshBilling();   // moved here from showSignedIn(), after the session exists
+  } else {
+    document.getElementById('authLoadingOverlay').classList.remove('active');
+    showSignedOut();
+  }
 }
 function connectFirebase(config){
   if(typeof firebase === 'undefined'){ console.error('Firebase SDK did not load.'); return; }

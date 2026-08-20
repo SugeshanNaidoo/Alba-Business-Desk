@@ -4,7 +4,9 @@ rules_version = '2';
 // Deploy via: Firebase console → Firestore Database → Rules, or `firebase deploy --only firestore:rules`
 //
 // Collections:
-//   /flowline_crm_users/{uid}   — each user's CRM data (contacts, deals, etc.)
+//   /albabusinessdesk_crm_users/{uid} — each user's CRM data (renamed from
+//                                 flowline_crm_users; the old collection is
+//                                 retained read-only as a rollback source)
 //   /subscriptions/{uid}        — billing status, written ONLY by the backend
 //                                  (via the Admin SDK, which bypasses these
 //                                  rules entirely) after a verified PayFast
@@ -50,7 +52,184 @@ service cloud.firestore {
              && get(/databases/$(database)/documents/subscriptions/$(userId)).data.status == 'active';
     }
 
-    match /flowline_crm_users/{userId} {
+    /* ==================== ORGANISATION LAYER (Phase 2) ====================
+       Membership is authoritative at organisations/{orgId}/members/{uid}
+       with status == 'active'. users/{uid}.organisationIds is a cache and is
+       deliberately NEVER consulted here — a tampered cache must not grant
+       access.
+
+       No recursive wildcard (match /organisations/{orgId}/{document=**}) is
+       used. Each descendant collection gets its own explicit rule as its
+       migration phase lands, so a new subcollection is denied by the
+       catch-all until someone deliberately opens it.
+
+       Cost note: isActiveMember() costs one get(). Firestore allows 10
+       document reads per rule evaluation, and the role travels on the same
+       member document, so one read answers both "is this a member" and
+       "what may they do". */
+
+    function memberDoc(orgId) {
+      return get(/databases/$(database)/documents/organisations/$(orgId)/members/$(request.auth.uid));
+    }
+    function isActiveMember(orgId) {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/organisations/$(orgId)/members/$(request.auth.uid))
+             && memberDoc(orgId).data.status == 'active';
+    }
+    function memberRole(orgId) {
+      return memberDoc(orgId).data.role;
+    }
+    function isOrgOwner(orgId) {
+      return isActiveMember(orgId) && memberRole(orgId) == 'owner';
+    }
+    function isOrgAdmin(orgId) {
+      return isActiveMember(orgId) && (memberRole(orgId) == 'owner' || memberRole(orgId) == 'admin');
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      // Write-denied to clients. The profile is created and maintained by
+      // the Admin SDK in api/organisation.js, which bypasses these rules.
+      //
+      // Denying outright is deliberate: a field-level diff() guard behaves
+      // awkwardly on create (resource is null), and there is no Phase 2
+      // feature that needs a client write here. If profile editing is added
+      // later, it goes through the API — which keeps activeOrganisationId
+      // and organisationIds server-managed by construction.
+      allow write: if false;
+    }
+
+    match /organisations/{orgId} {
+      allow read: if isActiveMember(orgId);
+      // Bootstrap happens server-side via the Admin SDK, which bypasses
+      // these rules entirely. No client creation path is needed or wanted.
+      allow create: if false;
+      // Renaming is an owner/admin action and goes through the API, but even
+      // if it were done client-side these fields must stay untouchable:
+      // subscription is billing state, ownerId is authority, migration is
+      // data-integrity state.
+      allow update: if isOrgAdmin(orgId)
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['subscription', 'ownerId', 'migration', 'migrationMeta', 'dataModelVersion']);
+      allow delete: if false;
+    }
+
+    match /organisations/{orgId}/members/{memberId} {
+      // Members can see who else is in the organisation.
+      allow read: if isActiveMember(orgId);
+      // All membership changes (invite, role change, soft removal) run
+      // server-side. Removal sets status:'removed' and never deletes the
+      // document, so history survives — see MIGRATION.md.
+      allow write: if false;
+    }
+
+    /* ---- CRM subcollections -------------------------------------------
+       Explicit rule per collection. No recursive wildcard: a subcollection
+       added later is denied by the catch-all until someone deliberately
+       opens it.
+
+       Shared shape:
+         read   — any active member (including viewer)
+         write  — member+ (viewer is read-only)
+       Sensitive collections (socialAccounts, auditLogs) are read-only or
+       fully server-side even for owners, because they carry integration
+       metadata and security history that clients must not forge. */
+
+    // Read budget: isActiveMember() does exists()+get() on the member doc,
+    // memberRole() re-reads the same doc (Firestore caches identical get()s
+    // within one evaluation), and entityUnlocked() reads the org doc. That is
+    // 2 distinct documents against the limit of 10 per evaluation.
+    // Billing belongs to the ORGANISATION, so entitlement is the owner's
+    // subscription — not the acting member's. A team member on a paid
+    // organisation can write; nobody can write on an unpaid one.
+    //
+    // subscriptions/{ownerUid} remains the single source of truth (PayFast
+    // m_payment_id is bound to that uid); organisations/*.subscription is a
+    // backend-maintained mirror and is deliberately NOT trusted here.
+    function orgIsSubscribed(orgId) {
+      return isSubscribed(get(/databases/$(database)/documents/organisations/$(orgId)).data.ownerId);
+    }
+    function canWriteCrm(orgId) {
+      return isActiveMember(orgId)
+             && memberRole(orgId) in ['owner', 'admin', 'member']
+             && orgIsSubscribed(orgId);
+    }
+    // An entity mid-migration must not be written by anyone: partial v2 data
+    // exists and a client write could interleave with the migration.
+    // Bracket access on an absent map key ERRORS in rules rather than
+    // returning null, so .get(key, default) is used — an entity missing from
+    // the map is treated as 'legacy' (client writes denied), matching the
+    // client's own fail-safe default in entityMode().
+    function entityUnlocked(orgId, entity) {
+      return get(/databases/$(database)/documents/organisations/$(orgId))
+               .data.get('migration', {}).get(entity, 'legacy') == 'v2';
+    }
+
+    match /organisations/{orgId}/contacts/{contactId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'contacts');
+    }
+    match /organisations/{orgId}/companies/{companyId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'companies');
+    }
+    match /organisations/{orgId}/deals/{dealId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'deals');
+    }
+    match /organisations/{orgId}/tasks/{taskId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'tasks');
+    }
+    match /organisations/{orgId}/activities/{activityId} {
+      allow read:   if isActiveMember(orgId);
+      // Append-only: an activity is a historical record. Editing or deleting
+      // history is not a client capability.
+      allow create: if canWriteCrm(orgId) && entityUnlocked(orgId, 'activities');
+      allow update, delete: if false;
+    }
+    match /organisations/{orgId}/calendarEvents/{eventId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'calendarEvents');
+    }
+
+    /* Integration metadata. Readable so the UI can show connection status;
+       NEVER client-writable — connections are made through the OAuth routes,
+       and the tokens themselves live in social_connections/ outside this
+       tree entirely. */
+    match /organisations/{orgId}/socialAccounts/{accountId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if false;
+    }
+    match /organisations/{orgId}/whatsappAccounts/{accountId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if false;
+    }
+    /* WhatsApp conversations and messages are written by the webhook and the
+       send route (Admin SDK). Clients read through the authenticated API,
+       not directly, so both are denied here. */
+    match /organisations/{orgId}/conversations/{conversationId} {
+      allow read, write: if false;
+    }
+    match /organisations/{orgId}/conversations/{conversationId}/messages/{messageId} {
+      allow read, write: if false;
+    }
+    match /organisations/{orgId}/files/{fileId} {
+      allow read:  if isActiveMember(orgId);
+      allow write: if canWriteCrm(orgId) && entityUnlocked(orgId, 'files');
+    }
+    /* Security history: server-written only, and readable only by
+       owner/admin. A member must not be able to inspect or forge the trail. */
+    match /organisations/{orgId}/auditLogs/{logId} {
+      allow read:  if isOrgAdmin(orgId);
+      allow write: if false;
+    }
+
+    /* Renamed collection. The old one below stays readable (and deletable by
+       its owner) so a user whose workspace has not yet been copied forward
+       can still load their data, and so account deletion can erase both.
+       It is NOT writable — all new writes go to the renamed collection. */
+    match /albabusinessdesk_crm_users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && isWellFormed();
       allow update: if isOwner(userId) && isWellFormed() && isSubscribed(userId);
@@ -96,6 +275,12 @@ service cloud.firestore {
     }
     match /whatsapp_phone_lookup/{phoneNumberId} {
       allow read, write: if false;
+    }
+
+    match /flowline_crm_users/{userId} {
+      allow read: if isOwner(userId);      // fallback read before copy-forward
+      allow delete: if isOwner(userId);    // account deletion erases both
+      allow create, update: if false;      // frozen — writes go to the new name
     }
 
     // Deny everything else by default — this stops any future collection
