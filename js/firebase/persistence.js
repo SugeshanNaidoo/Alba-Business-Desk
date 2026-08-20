@@ -199,8 +199,14 @@ async function runPendingMigrations(onProgress){
                     'socialAccounts','calendarEvents','whatsapp','files','auditLogs'];
   const summary = {};
 
+  // When the server reports a newer adapter version than the one this
+  // workspace was migrated with, already-migrated entities must be re-written
+  // by the corrected adapter — so don't skip them.
+  const needsRepair = !!(ORG_CONTEXT.adapterVersion && ORG_CONTEXT.storedAdapterVersion
+                         && ORG_CONTEXT.storedAdapterVersion < ORG_CONTEXT.adapterVersion);
+
   for(const entity of entities){
-    if(entityMode(entity) === 'v2'){ summary[entity] = 'already migrated'; continue; }
+    if(entityMode(entity) === 'v2' && !needsRepair){ summary[entity] = 'already migrated'; continue; }
     let guard = 0;   // bounds the loop even if the server never reports done
     while(guard++ < 200){
       let data;

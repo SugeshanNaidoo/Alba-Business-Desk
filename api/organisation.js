@@ -16,7 +16,7 @@ const { resolveOrgContext, defaultMigrationState, roleAtLeast,
 const { checkRateLimit } = require('../lib/rateLimit');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
 const { logEvent, clientIp } = require('../lib/auditLog');
-const { migrateChunk, listEntities } = require('../lib/entityMigration');
+const { migrateChunk, listEntities, ADAPTER_VERSION } = require('../lib/entityMigration');
 const crypto = require('crypto');
 
 // How long a migration lock is honoured before another request may take it
@@ -187,7 +187,11 @@ async function handleBootstrap(req, res){
       orgId: result.orgId,
       role: result.role,
       organisationName: result.org.name || '',
-      migration: Object.assign(defaultMigrationState(), result.org.migration || {})
+      migration: Object.assign(defaultMigrationState(), result.org.migration || {}),
+      // The client compares this against the org's stored value to decide
+      // whether already-migrated entities need re-writing by a fixed adapter.
+      adapterVersion: ADAPTER_VERSION,
+      storedAdapterVersion: (result.org.adapterVersion || 1)
     });
   }catch(err){
     if(err.status) return res.status(err.status).json({ error: err.message });
@@ -204,7 +208,8 @@ async function handleContext(req, res){
       orgId: ctx.orgId,
       role: ctx.role,
       organisationName: ctx.organisation.name,
-      migration: ctx.migration
+      migration: ctx.migration,
+      adapterVersion: ADAPTER_VERSION
     });
   }catch(err){
     return res.status(err.status || 500).json({ error: err.message });
@@ -368,7 +373,15 @@ async function handleMigrate(req, res){
   if(!listEntities().includes(entity)){
     return res.status(400).json({ error: `Unknown entity. One of: ${listEntities().join(', ')}` });
   }
-  if(ctx.migration[entity] === 'v2'){
+  // Normally a v2 entity is skipped. But when the adapter version has moved
+  // on, the stored documents were written by an older (here: incorrect)
+  // mapping and must be re-written. Re-running is safe — same document ids,
+  // merged — so it repairs in place.
+  const orgSnap = await getDb().collection('organisations').doc(ctx.orgId).get();
+  const storedAdapterVersion = (orgSnap.exists && orgSnap.data().adapterVersion) || 1;
+  const needsRepair = storedAdapterVersion < ADAPTER_VERSION;
+
+  if(ctx.migration[entity] === 'v2' && !needsRepair){
     return res.status(200).json({ ok: true, done: true, entity, state: 'v2', note: 'Already migrated.' });
   }
 
@@ -393,6 +406,8 @@ async function handleMigrate(req, res){
 
     if(result.done){
       await releaseMigrationLock(ctx.orgId, entity, lock.migrationId, 'completed');
+      await getDb().collection('organisations').doc(ctx.orgId)
+        .set({ adapterVersion: ADAPTER_VERSION, updatedAt: Date.now() }, { merge: true });
       await logEvent('entity_migrated', { uid: ctx.uid, ip, detail: `${entity}:${result.total}` });
       return res.status(200).json({ ok: true, done: true, entity, state: 'v2', ...result });
     }

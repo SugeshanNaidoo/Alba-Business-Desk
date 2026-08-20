@@ -89,7 +89,11 @@ async function initOrgContext(){
       orgId: data.orgId,
       role: data.role,
       organisationName: data.organisationName || '',
-      migration: data.migration || {}
+      migration: data.migration || {},
+      // Used to detect that already-migrated entities were written by an
+      // older adapter and need re-writing.
+      adapterVersion: data.adapterVersion || 1,
+      storedAdapterVersion: data.storedAdapterVersion || data.adapterVersion || 1
     };
     return ORG_CONTEXT;
   }catch(err){
