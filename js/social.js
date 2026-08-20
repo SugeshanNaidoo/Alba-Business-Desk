@@ -12,6 +12,19 @@ const PLATFORM_COLORS = {
 };
 function platformById(id){ return DATA.socialPlatforms.find(p=>p.id===id); }
 function platformColor(name){ return PLATFORM_COLORS[name] || '#6E6E73'; }
+
+/* Brand marks for the platforms we integrate with, drawn as single white
+   paths so they sit on the platform's own brand colour. Anything without a
+   mark (legacy platforms from before the list was trimmed) falls back to
+   its first letter, so existing workspaces never render an empty badge. */
+const PLATFORM_ICONS = {
+  'Instagram':'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.86s0 3.6-.07 4.86c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.86.07s-3.6 0-4.86-.07c-1.17-.05-1.8-.25-2.23-.41-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.2 15.6 2.2 15.2 2.2 12s0-3.6.07-4.86c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.4 2.2 8.8 2.2 12 2.2zm0 1.8c-3.15 0-3.5.01-4.74.07-.9.04-1.38.19-1.7.31-.43.17-.73.37-1.05.69-.32.32-.52.62-.69 1.05-.12.32-.27.8-.31 1.7C3.45 8.5 3.44 8.85 3.44 12s.01 3.5.07 4.74c.04.9.19 1.38.31 1.7.17.43.37.73.69 1.05.32.32.62.52 1.05.69.32.12.8.27 1.7.31 1.24.06 1.59.07 4.74.07s3.5-.01 4.74-.07c.9-.04 1.38-.19 1.7-.31.43-.17.73-.37 1.05-.69.32-.32.52-.62.69-1.05.12-.32.27-.8.31-1.7.06-1.24.07-1.59.07-4.74s-.01-3.5-.07-4.74c-.04-.9-.19-1.38-.31-1.7a2.83 2.83 0 0 0-.69-1.05 2.83 2.83 0 0 0-1.05-.69c-.32-.12-.8-.27-1.7-.31C15.5 4.01 15.15 4 12 4zm0 3.03a4.97 4.97 0 1 1 0 9.94 4.97 4.97 0 0 1 0-9.94zm0 1.8a3.17 3.17 0 1 0 0 6.34 3.17 3.17 0 0 0 0-6.34zm6.34-.35a1.16 1.16 0 1 1-2.32 0 1.16 1.16 0 0 1 2.32 0z"/></svg>',
+  'Facebook':'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.5 22v-8.4h2.9l.44-3.3H14.5V8.2c0-.95.27-1.6 1.66-1.6h1.77V3.65c-.31-.04-1.36-.13-2.58-.13-2.56 0-4.31 1.55-4.31 4.4v2.38H8.13v3.3h2.91V22z"/></svg>',
+  'TikTok':'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.1 2.5c.44 1.06 1.5 1.9 2.7 2.05v2.5c-1.06 0-2.1-.35-3.05-.95v5.24c0 2.68-2.2 4.85-4.92 4.85S5.9 14.02 5.9 11.34c0-2.6 2.06-4.72 4.64-4.84v2.5c-1.2.12-2.14 1.1-2.14 2.34a2.37 2.37 0 0 0 4.74 0V2.5z"/></svg>'
+};
+function platformIcon(name){
+  return PLATFORM_ICONS[name] || escapeHtml((name||'?').charAt(0).toUpperCase());
+}
 function postEngagement(post){ return Number(post.likes||0)+Number(post.comments||0)+Number(post.shares||0); }
 function snapshotsFor(platformId){
   return DATA.socialSnapshots.filter(s=>s.platformId===platformId).sort((a,b)=>a.date.localeCompare(b.date));
@@ -52,7 +65,7 @@ function renderPlatforms(){
     const deltaHtml = delta===null ? '' : `<div class="platform-delta ${delta>=0?'up':'down'}">${delta>=0?'+':''}${delta.toLocaleString()} since last update</div>`;
     const canSync = !!SYNCABLE_PLATFORMS[p.name];
     return `<div class="platform-card" data-platform="${p.id}">
-      <div class="platform-badge" style="background:${platformColor(p.name)};">${p.name.charAt(0)}</div>
+      <div class="platform-badge" style="background:${platformColor(p.name)};">${platformIcon(p.name)}</div>
       <div class="platform-name">${escapeHtml(p.name)}</div>
       <div class="platform-handle">${escapeHtml(p.handle||'')}</div>
       <div class="platform-followers">${Number(p.followers||0).toLocaleString()}</div>
