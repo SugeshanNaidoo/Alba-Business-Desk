@@ -560,9 +560,16 @@ function renderMigrationStatus(){
   const el = document.getElementById('migrationStatusList');
   if(!el) return;
   if(!ORG_CONTEXT || !ORG_CONTEXT.migration){
-    el.innerHTML = '<p class="topbar-sub">Sign in to see upgrade status.</p>';
+    // Distinguish "not signed in" from "the organisation layer failed to
+    // initialise" — the second is a deployment problem and silently showing
+    // nothing makes it impossible to diagnose.
+    el.innerHTML = orgContextError
+      ? `<p class="topbar-sub" style="color:var(--clay);">Workspace layer unavailable — ${escapeHtml(orgContextError)}<br>Your data is safe and the app is running on its previous storage. Deploy the backend and Firestore rules, then reload.</p>`
+      : '<p class="topbar-sub">Sign in to see upgrade status.</p>';
+    document.getElementById('runMigrationBtn').disabled = true;
     return;
   }
+  document.getElementById('runMigrationBtn').disabled = false;
   const labels = { contacts:'Contacts', companies:'Companies', deals:'Deals',
     tasks:'Tasks', activities:'Activity', calendarEvents:'Calendar',
     socialAccounts:'Social', whatsapp:'WhatsApp', files:'Files', auditLogs:'Audit log' };

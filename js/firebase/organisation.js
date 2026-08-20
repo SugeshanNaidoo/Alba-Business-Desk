@@ -11,6 +11,7 @@
    null as "legacy" rather than as an error — see entityMode(). */
 let ORG_CONTEXT = null;
 let orgContextReady = false;
+let orgContextError = null;   // last bootstrap failure, surfaced in Settings
 
 /* The single source of truth for which DATA keys belong to which migratable
    entity. pushCloudData() uses this to strip migrated entities out of the
@@ -80,6 +81,7 @@ async function initOrgContext(){
       // as it did before. Failing closed here would break a working product
       // for the sake of a layer nothing depends on yet.
       console.error('Organisation bootstrap failed — continuing on legacy persistence:', data.error);
+      orgContextError = `${res.status}: ${data.error || 'Unknown error'}`;
       ORG_CONTEXT = null;
       return null;
     }
@@ -92,6 +94,7 @@ async function initOrgContext(){
     return ORG_CONTEXT;
   }catch(err){
     console.error('Could not reach the organisation endpoint — continuing on legacy persistence:', err);
+    orgContextError = `Could not reach /api/organisation (${err.message}). Is the backend deployed?`;
     ORG_CONTEXT = null;
     return null;
   }finally{

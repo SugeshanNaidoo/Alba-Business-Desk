@@ -109,6 +109,13 @@ document.getElementById('dialogOverlay').addEventListener('click', e=>{
    so this check being skipped or bypassed never grants real access. */
 function requireSubscriptionForAction(){
   if(typeof SUBSCRIPTION_ACTIVE !== 'undefined' && SUBSCRIPTION_ACTIVE) return true;
+  // Don't accuse a paying user of being in view-only mode just because the
+  // status check hasn't come back yet — that was a real false positive.
+  if(typeof SUBSCRIPTION_KNOWN !== 'undefined' && !SUBSCRIPTION_KNOWN){
+    showAlert('Still checking your subscription — give it a second and try again.', { title:'One moment' });
+    if(typeof refreshSubscriptionStatus === 'function') refreshSubscriptionStatus();
+    return false;
+  }
   showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to use this.", { title:'Subscription needed' });
   return false;
 }

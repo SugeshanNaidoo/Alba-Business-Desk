@@ -102,6 +102,7 @@ async function refreshBilling(){
 }
 
 let SUBSCRIPTION_ACTIVE = false;
+let SUBSCRIPTION_KNOWN = false;   // false until a status check has returned
 let subscriptionCheckedOnce = false;
 
 async function refreshSubscriptionStatus(){
@@ -122,6 +123,7 @@ async function refreshSubscriptionStatus(){
     textEl.textContent = SUBSCRIPTION_LABELS[status] || status;
     const isActive = status === 'active';
     SUBSCRIPTION_ACTIVE = isActive;
+    SUBSCRIPTION_KNOWN = true;
     subscribeBtn.style.display = isActive ? 'none' : 'inline-flex';
     cancelBtn.style.display = isActive ? 'inline-flex' : 'none';
     if(data.lastPaymentAt){
@@ -394,6 +396,11 @@ async function handleAuthChange(user){
     // known before workspace data loads — otherwise pullCloudData() cannot
     // tell which entities the legacy payload still owns.
     await establishBackendSession();
+    // Entitlement FIRST, before any data loading. SUBSCRIPTION_ACTIVE starts
+    // false, and every gated action consults it — so if this runs late, a
+    // genuinely subscribed user is told they are in view-only mode for the
+    // whole window. Resolve it as soon as the session exists.
+    await refreshBilling();
     await initOrgContext();
     document.getElementById('authLoadingOverlay').classList.remove('active');
     // Legacy payload first (it still owns any un-migrated entity), then
@@ -402,7 +409,6 @@ async function handleAuthChange(user){
     await pullCloudData();
     await hydrateMigratedEntities();
     renderAll();
-    refreshBilling();   // moved here from showSignedIn(), after the session exists
   } else {
     document.getElementById('authLoadingOverlay').classList.remove('active');
     showSignedOut();
