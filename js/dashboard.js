@@ -41,10 +41,10 @@ function renderDashboard(){
   document.getElementById('activityList').innerHTML = DATA.activity.slice(0,8).map(a=>`
     <div class="activity-row">
       <div class="activity-dot"></div>
-      <div><div class="activity-text">${a.text}</div><div class="activity-time">${timeAgo(a.timestamp)}</div></div>
+      <div><div class="activity-text">${escapeHtml(activityText(a))}</div><div class="activity-time">${timeAgo(activityTime(a))}</div></div>
     </div>`).join('') || `<div class="empty-state"><p>No activity yet.</p></div>`;
 
-  const upcoming = DATA.tasks.filter(t=>!t.done).sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||'')).slice(0,5);
+  const upcoming = DATA.tasks.filter(t=>!t.done).sort((a,b)=>byDateStr(a.dueDate, b.dueDate)).slice(0,5);
   document.getElementById('dashTaskList').innerHTML = upcoming.map(t=>`
     <div class="task-mini ${isOverdue(t)?'overdue':''}">
       <input type="checkbox" data-task-toggle="${t.id}">

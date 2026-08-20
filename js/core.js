@@ -234,6 +234,20 @@ function logActivity(text, opts){
     type: opts.type || 'System', relatedType: opts.relatedType || null, relatedId: opts.relatedId || null});
   DATA.activity = DATA.activity.slice(0,60);
 }
+/* Activity documents should always carry `text` and `timestamp` (see
+   logActivity above). These accessors exist because a single malformed
+   record — one written by an older build, or partially saved — should degrade
+   to a readable line rather than rendering "undefined / NaNd ago" and making
+   the whole dashboard look broken. */
+function activityText(a){
+  if(!a) return 'Activity';
+  return a.text || a.title || a.description || 'Activity';
+}
+function activityTime(a){
+  if(!a) return null;
+  return a.timestamp !== undefined ? a.timestamp : (a.createdAt !== undefined ? a.createdAt : null);
+}
+
 function activityFor(relatedType, relatedId){
   return DATA.activity.filter(a=>a.relatedType===relatedType && a.relatedId===relatedId);
 }
@@ -245,7 +259,14 @@ function uid(prefix){ return prefix + Date.now() + Math.floor(Math.random()*1000
 function fmtMoney(n){ return 'R ' + Number(n||0).toLocaleString('en-ZA'); }
 function fmtDate(s){ if(!s) return '—'; const d=new Date(s); return d.toLocaleDateString('en-ZA',{day:'numeric',month:'short'}); }
 function timeAgo(ts){
-  const diff = Date.now()-ts, m=60000,h=3600000,d=86400000;
+  // Accept a number, an ISO string, or a Firestore Timestamp. Anything
+  // unparseable returns a neutral label rather than "NaNd ago".
+  let t = ts;
+  if(t && typeof t === 'object' && typeof t.toMillis === 'function') t = t.toMillis();
+  if(typeof t === 'string') t = Date.parse(t);
+  if(typeof t !== 'number' || !isFinite(t)) return 'recently';
+  const diff = Date.now()-t, m=60000,h=3600000,d=86400000;
+  if(diff < 0) return 'just now';
   if(diff<h) return Math.max(1,Math.round(diff/m))+'m ago';
   if(diff<d) return Math.round(diff/h)+'h ago';
   return Math.round(diff/d)+'d ago';
@@ -256,13 +277,32 @@ function initials(name){
 function contactById(id){ return DATA.contacts.find(c=>c.id===id); }
 function companyById(id){ return DATA.companies.find(co=>co.id===id); }
 function dealById(id){ return DATA.deals.find(d=>d.id===id); }
-function isOverdue(t){ return !t.done && t.dueDate && t.dueDate < new Date().toISOString().slice(0,10); }
-function isDueToday(t){ return !t.done && t.dueDate === new Date().toISOString().slice(0,10); }
+/* The app stores dates as 'YYYY-MM-DD' strings (what <input type="date">
+   produces, and what the sorts and comparisons here assume). Documents
+   written by an earlier build stored some of them as numeric timestamps,
+   which made `.localeCompare` blow up. This coerces any of number, Date,
+   Firestore Timestamp or ISO string to the expected string form. */
+function toDateStr(v){
+  if(v === null || v === undefined || v === '') return '';
+  if(typeof v === 'string') return v.length > 10 ? v.slice(0,10) : v;
+  if(typeof v === 'object' && typeof v.toMillis === 'function') v = v.toMillis();
+  if(v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString().slice(0,10);
+  if(typeof v === 'number' && isFinite(v)){
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0,10);
+  }
+  return '';
+}
+/* Sort comparator that never throws, whatever the stored type. */
+function byDateStr(a, b){ return toDateStr(a).localeCompare(toDateStr(b)); }
+
+function isOverdue(t){ const d = toDateStr(t.dueDate); return !t.done && !!d && d < new Date().toISOString().slice(0,10); }
+function isDueToday(t){ return !t.done && toDateStr(t.dueDate) === new Date().toISOString().slice(0,10); }
 
 function renderNotifications(){
   const today = new Date().toISOString().slice(0,10);
-  const relevant = DATA.tasks.filter(t=>!t.done && t.dueDate && t.dueDate<=today)
-    .sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const relevant = DATA.tasks.filter(t=>!t.done && toDateStr(t.dueDate) && toDateStr(t.dueDate)<=today)
+    .sort((a,b)=>byDateStr(a.dueDate, b.dueDate));
   const badge = document.getElementById('notifBadge');
   if(relevant.length){ badge.style.display='block'; badge.textContent = relevant.length>9?'9+':relevant.length; }
   else { badge.style.display='none'; }

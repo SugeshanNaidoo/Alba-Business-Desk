@@ -7,7 +7,7 @@ function renderTasks(){
     el.classList.toggle('active', el.dataset.filter===taskFilter);
     el.onclick = ()=>{ taskFilter = el.dataset.filter; renderTasks(); };
   });
-  let list = DATA.tasks.slice().sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
+  let list = DATA.tasks.slice().sort((a,b)=>byDateStr(a.dueDate, b.dueDate));
   if(taskFilter==='open') list = list.filter(t=>!t.done);
   if(taskFilter==='done') list = list.filter(t=>t.done);
 

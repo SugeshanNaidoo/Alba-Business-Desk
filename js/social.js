@@ -27,7 +27,7 @@ function platformIcon(name){
 }
 function postEngagement(post){ return Number(post.likes||0)+Number(post.comments||0)+Number(post.shares||0); }
 function snapshotsFor(platformId){
-  return DATA.socialSnapshots.filter(s=>s.platformId===platformId).sort((a,b)=>a.date.localeCompare(b.date));
+  return DATA.socialSnapshots.filter(s=>s.platformId===platformId).sort((a,b)=>byDateStr(a.date, b.date));
 }
 
 function renderSocial(){
@@ -137,8 +137,14 @@ async function syncPlatform(platformId){
     const freshStatusEl = document.getElementById(`syncStatus-${platformId}`);
     if(freshStatusEl) freshStatusEl.textContent = `Synced just now — ${newPosts} new post${newPosts===1?'':'s'}.`;
   }catch(err){
-    if(statusEl) statusEl.textContent = `Sync failed — ${err.message || 'please try again.'}`;
-    console.error(err);
+    // Distinguish a genuine sync failure from a rendering error that happened
+    // afterwards — attributing a render crash to "sync failed" sent us
+    // looking in entirely the wrong place once already.
+    const rendering = /localeCompare|is not a function|Cannot read/.test(err.message || '');
+    if(statusEl) statusEl.textContent = rendering
+      ? 'Synced, but the page could not refresh — please reload.'
+      : `Sync failed — ${err.message || 'please try again.'}`;
+    console.error(rendering ? 'Render error after sync:' : 'Sync error:', err);
   }
 }
 
@@ -320,7 +326,7 @@ function renderPosts(){
 }
 
 function renderMentions(){
-  const mentions = DATA.socialMentions.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const mentions = DATA.socialMentions.slice().sort((a,b)=>byDateStr(b.date, a.date));
   const list = document.getElementById('mentionsList');
   document.getElementById('mentionsEmpty').style.display = mentions.length ? 'none' : 'block';
   list.innerHTML = mentions.map(m=>{

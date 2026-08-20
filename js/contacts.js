@@ -51,7 +51,7 @@ function renderContacts(){
   const search = document.getElementById('globalSearch').value.toLowerCase();
   let list = groupContacts.filter(c=> contactTag==='all' || c.tag===contactTag);
   if(search) list = list.filter(c=>(c.name+c.company+c.email).toLowerCase().includes(search));
-  list = list.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  list = list.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 
   const tbody = document.getElementById('contactsTbody');
   document.getElementById('contactsEmpty').style.display = list.length ? 'none':'block';
@@ -81,7 +81,7 @@ document.querySelectorAll('#contactsSubNav .chip').forEach(el=>{
 });
 
 function renderCompanies(){
-  const list = DATA.companies.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const list = DATA.companies.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
   document.getElementById('companiesSummary').textContent = `${list.length} compan${list.length===1?'y':'ies'}`;
   const tbody = document.getElementById('companiesTbody');
   document.getElementById('companiesEmpty').style.display = list.length ? 'none' : 'block';
@@ -229,7 +229,7 @@ function renderContactActivityTimeline(contactId){
   const list = activityFor('contact', contactId);
   document.getElementById('drawerActivity').innerHTML = list.length ? list.map(a=>`
     <div class="activity-row"><div class="activity-dot"></div>
-      <div><div class="activity-text"><strong>${a.type}:</strong> ${escapeHtml(a.text)}</div><div class="activity-time">${timeAgo(a.timestamp)}</div></div>
+      <div><div class="activity-text"><strong>${escapeHtml(a.type||"Note")}:</strong> ${escapeHtml(activityText(a))}</div><div class="activity-time">${timeAgo(activityTime(a))}</div></div>
     </div>`).join('') : '<p class="topbar-sub" style="padding:6px 0;">No activity logged yet.</p>';
 }
 function openDrawer(contactId){

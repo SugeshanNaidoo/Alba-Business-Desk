@@ -97,7 +97,7 @@ function renderDealActivityTimeline(dealId){
   const list = activityFor('deal', dealId);
   document.getElementById('dealActivityTimeline').innerHTML = list.length ? list.map(a=>`
     <div class="activity-row"><div class="activity-dot"></div>
-      <div><div class="activity-text"><strong>${a.type}:</strong> ${escapeHtml(a.text)}</div><div class="activity-time">${timeAgo(a.timestamp)}</div></div>
+      <div><div class="activity-text"><strong>${escapeHtml(a.type||"Note")}:</strong> ${escapeHtml(activityText(a))}</div><div class="activity-time">${timeAgo(activityTime(a))}</div></div>
     </div>`).join('') : '<p class="topbar-sub" style="padding:8px 0;">No activity logged yet.</p>';
 }
 function openDealModal(id, presetStage){

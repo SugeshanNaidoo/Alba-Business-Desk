@@ -53,6 +53,46 @@ function _configOf(d){
   return o;
 }
 
+/* Repairs documents that use an older field naming.
+
+   The app briefly wrote some records with canonical names (title/createdAt
+   instead of text/timestamp) before the storage rewrite. A single such
+   document made the dashboard render "undefined / NaNd ago". This fills the
+   expected field ONLY when it is genuinely missing — it never overwrites a
+   real value — and because the repaired record then differs from the stored
+   one, the next sync writes the correction back permanently. */
+function normaliseRecord(entity, r){
+  const fill = (want, from) => {
+    if(r[want] === undefined && r[from] !== undefined) r[want] = r[from];
+  };
+  if(entity === 'activities'){
+    fill('text','title'); fill('timestamp','createdAt');
+    if(r.text === undefined) r.text = 'Activity';
+    if(r.timestamp === undefined) r.timestamp = Date.now();
+  }
+  if(entity === 'contacts'){ fill('tag','status'); }
+  if(entity === 'deals'){
+    fill('closeDate','expectedCloseDate'); fill('owner','assignedTo');
+    // Dates are 'YYYY-MM-DD' strings in this app; an older build stored some
+    // as numeric timestamps, which broke every sort and comparison.
+    if(r.closeDate !== undefined) r.closeDate = toDateStr(r.closeDate);
+  }
+  if(entity === 'tasks'){
+    // NOTE: the canonical field here is `dueDate` (not `due`) — an earlier
+    // version of this normaliser had that backwards.
+    fill('dueDate','due'); fill('owner','assignedTo');
+    if(r.dueDate !== undefined) r.dueDate = toDateStr(r.dueDate);
+  }
+  if(entity === 'activities' && r.timestamp !== undefined && typeof r.timestamp === 'string'){
+    const n = Date.parse(r.timestamp);
+    if(!isNaN(n)) r.timestamp = n;   // timestamps are numbers here
+  }
+  if(entity === 'socialSnapshots' && r.date !== undefined) r.date = toDateStr(r.date);
+  if(entity === 'socialMentions' && r.date !== undefined) r.date = toDateStr(r.date);
+  if(entity === 'socialPlatforms'){ fill('handle','username'); }
+  return r;
+}
+
 /* Loads the whole workspace into DATA. Called once after the organisation is
    resolved, before the first render. */
 async function loadWorkspace(){
@@ -78,7 +118,7 @@ async function loadWorkspace(){
   for(const [entity, store] of Object.entries(ENTITY_STORES)){
     try{
       const snap = await ref.collection(store.collection).limit(5000).get();
-      DATA[store.dataKey] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      DATA[store.dataKey] = snap.docs.map(d => normaliseRecord(entity, { id: d.id, ...d.data() }));
       _lastSynced[entity] = _snapshot(DATA[store.dataKey]);
     }catch(err){
       console.error(`Could not load ${entity}:`, err);
