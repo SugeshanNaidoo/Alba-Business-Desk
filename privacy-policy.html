@@ -13,7 +13,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787243795">
+<link rel="stylesheet" href="policy.css?v=1787258624">
 </head>
 <body>
   <header class="policy-header">
@@ -178,7 +178,7 @@
       <li>Cancel any active subscription first, so you're never charged again;</li>
       <li>Delete your CRM data, payment history, and sign-in record;</li>
       <li>Delete your connected social media, calendar, and WhatsApp credentials, and all stored WhatsApp message history;</li>
-      <li>Delete your workspace records — contacts, companies, deals, tasks and activity — and both the current and the previous copy of your workspace storage;</li>
+      <li>Delete your workspace and every record in it — contacts, companies, deals, tasks, activity and settings;</li>
       <li>Retain a limited security audit log entry — that an account existed and was deleted, with a timestamp — for a reasonable period afterward, for fraud prevention and legal compliance.</li>
     </ol>
     <p>
@@ -189,16 +189,10 @@
 
     <h2 id="storage">7a. How your workspace data is stored</h2>
     <p>
-      Workspace data is being moved from a single combined record per account
-      to individual records per item (each contact, deal and task stored
-      separately). This improves reliability and lets us apply finer-grained
-      access controls.
-    </p>
-    <p>
-      During this change a previous copy of your workspace is deliberately
-      retained so nothing can be lost if the upgrade needs to be reversed. It
-      is not used to serve the application once your data has been upgraded,
-      and it is deleted along with everything else if you delete your account.
+      Your workspace data is stored as individual records — each contact,
+      company, deal, task and activity is held separately, with your workspace
+      settings kept alongside them. Access to every one of those records is
+      controlled by your workspace membership and role.
     </p>
 
     <h2 id="security">8. How we protect information</h2>
@@ -277,6 +271,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787243795"></script>
+  <script src="policy.js?v=1787258624"></script>
 </body>
 </html>

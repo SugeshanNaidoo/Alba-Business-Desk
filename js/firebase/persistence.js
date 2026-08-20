@@ -1,233 +1,162 @@
-// Persistence router.
+// Workspace persistence — organisation-native.
 //
-// Every CRM create/update/delete goes through persistEntity(). It routes to
-// whichever backing store owns that entity right now:
+// Two stores, no legacy path:
 //
-//   legacy       -> mutate DATA + saveData()   (the original behaviour)
-//   v2           -> write one Firestore document, and mirror into DATA so
-//                   the existing render functions keep working unchanged
-//   in_progress  -> refuse the write and say why
+//   organisations/{orgId}/config/workspace   one document holding workspace
+//                                            configuration (stages, statuses,
+//                                            custom fields, targets…). Small,
+//                                            bounded, always read together.
 //
-// This is what lets entities migrate one at a time: migrating contacts
-// changes only how contacts persist. Deals, tasks and everything else carry
-// on through the legacy path untouched.
+//   organisations/{orgId}/{entity}/{id}      one document per record for the
+//                                            collections that grow without
+//                                            bound (contacts, deals, tasks…).
+//
+// DATA remains the in-memory read-model every render function consumes. It is
+// hydrated from Firestore on sign-in and written back by diffing on save.
 
-/* Maps an entity to its DATA array key and its v2 subcollection. */
+/* Entity collections: DATA key -> Firestore subcollection. */
 const ENTITY_STORES = {
-  contacts:       { dataKey: 'contacts',        collection: 'contacts' },
-  companies:      { dataKey: 'companies',       collection: 'companies' },
-  deals:          { dataKey: 'deals',           collection: 'deals' },
-  tasks:          { dataKey: 'tasks',           collection: 'tasks' },
-  activities:     { dataKey: 'activity',        collection: 'activities' },
-  socialAccounts: { dataKey: 'socialPlatforms', collection: 'socialAccounts' }
+  contacts:        { dataKey: 'contacts',         collection: 'contacts' },
+  companies:       { dataKey: 'companies',        collection: 'companies' },
+  deals:           { dataKey: 'deals',            collection: 'deals' },
+  tasks:           { dataKey: 'tasks',            collection: 'tasks' },
+  activities:      { dataKey: 'activity',         collection: 'activities' },
+  socialPlatforms: { dataKey: 'socialPlatforms',  collection: 'socialAccounts' },
+  socialSnapshots: { dataKey: 'socialSnapshots',  collection: 'socialSnapshots' },
+  socialPosts:     { dataKey: 'socialPosts',      collection: 'socialPosts' },
+  socialMentions:  { dataKey: 'socialMentions',   collection: 'socialMentions' }
 };
 
-function orgCollection(entity){
-  const store = ENTITY_STORES[entity];
-  if(!store || !cloudDb || !currentOrgId()) return null;
-  return cloudDb.collection('organisations').doc(currentOrgId()).collection(store.collection);
+/* Configuration keys — stored together in one document. These are bounded and
+   always loaded as a unit, so splitting them into per-record documents would
+   cost reads for no benefit. */
+const CONFIG_KEYS = ['settings','stages','contactStatuses','leadSources',
+                     'customFieldDefs','teamMembers','lostReasons','salesTargets'];
+
+const _lastSynced = {};        // entity -> Map(id -> serialised record)
+let _lastConfig = null;        // serialised config, to detect changes
+
+function orgRef(){
+  return (cloudDb && currentOrgId())
+    ? cloudDb.collection('organisations').doc(currentOrgId())
+    : null;
 }
-
-/* ---- Sync-on-save --------------------------------------------------------
-   The existing modules all follow one shape: mutate a DATA array, then call
-   saveData(DATA). Rather than rewrite 36 call sites (and risk missing one,
-   which would silently drop writes), migrated entities are synchronised at
-   that single choke point by diffing DATA against the last known state.
-
-   Why a diff rather than per-record calls: it is idempotent, it cannot miss
-   a mutation performed anywhere in the codebase, and a failed sync simply
-   retries on the next save with no lost intent. */
-
-const _lastSynced = {};   // entity -> Map(id -> serialised record)
 
 function _snapshot(arr){
   const m = new Map();
   (arr || []).forEach(r => { if(r && r.id != null) m.set(String(r.id), JSON.stringify(r)); });
   return m;
 }
+function _configOf(d){
+  const o = {};
+  CONFIG_KEYS.forEach(k => { if(d[k] !== undefined) o[k] = d[k]; });
+  return o;
+}
 
-/* Pushes DATA changes for every v2 entity into Firestore. Called (debounced)
-   from saveData(). Never touches entities still on legacy. */
-async function syncMigratedEntities(){
-  if(!ORG_CONTEXT || !cloudDb || !currentOrgId()) return;
+/* Loads the whole workspace into DATA. Called once after the organisation is
+   resolved, before the first render. */
+async function loadWorkspace(){
+  const ref = orgRef();
+  if(!ref) return { ok:false, reason:'no organisation' };
 
+  const failures = [];
+
+  // Configuration.
+  try{
+    const cfg = await ref.collection('config').doc('workspace').get();
+    if(cfg.exists){
+      const data = cfg.data();
+      CONFIG_KEYS.forEach(k => { if(data[k] !== undefined) DATA[k] = data[k]; });
+    }
+    _lastConfig = JSON.stringify(_configOf(DATA));
+  }catch(err){
+    console.error('Could not load workspace configuration:', err);
+    failures.push('settings');
+  }
+
+  // Entity collections.
   for(const [entity, store] of Object.entries(ENTITY_STORES)){
-    if(entityMode(entity) !== 'v2') continue;
+    try{
+      const snap = await ref.collection(store.collection).limit(5000).get();
+      DATA[store.dataKey] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _lastSynced[entity] = _snapshot(DATA[store.dataKey]);
+    }catch(err){
+      console.error(`Could not load ${entity}:`, err);
+      // Leave the array empty rather than falling back to a stale local copy —
+      // a stale base could be written back over good data on the next save.
+      DATA[store.dataKey] = [];
+      failures.push(entity);
+    }
+  }
 
+  if(failures.length){
+    showAlert(`Could not load: ${failures.join(', ')}. Your data is safe — please refresh.`,
+      { title:'Some data did not load' });
+    return { ok:false, failures };
+  }
+  return { ok:true };
+}
+
+/* Writes DATA back to Firestore by diffing against the last known state.
+
+   The modules all mutate a DATA array then call saveData(), so syncing at
+   that single choke point means no CRUD call site can be missed. The diff is
+   idempotent, and a failed sync simply retries on the next save because the
+   baseline only advances on success. */
+async function syncWorkspace(){
+  const ref = orgRef();
+  if(!ref) return;
+
+  // Configuration — one document, written only when it actually changed.
+  try{
+    const cfg = _configOf(DATA);
+    const serialised = JSON.stringify(cfg);
+    if(serialised !== _lastConfig){
+      await ref.collection('config').doc('workspace').set({ ...cfg, updatedAt: Date.now() }, { merge:true });
+      _lastConfig = serialised;
+    }
+  }catch(err){
+    console.error('Could not save workspace configuration:', err);
+    _reportWriteFailure(err);
+  }
+
+  // Entities — per-record upserts and deletes.
+  for(const [entity, store] of Object.entries(ENTITY_STORES)){
     const current = _snapshot(DATA[store.dataKey]);
     const previous = _lastSynced[entity];
+    if(!previous){ _lastSynced[entity] = current; continue; }   // no baseline yet
 
-    // First sync after hydration establishes the baseline without writing —
-    // otherwise every record would be pointlessly rewritten on first save.
-    if(!previous){ _lastSynced[entity] = current; continue; }
-
-    const upserts = [];
-    const deletes = [];
-    current.forEach((json, id) => { if(previous.get(id) !== json) upserts.push([id, json]); });
-    previous.forEach((_, id) => { if(!current.has(id)) deletes.push(id); });
-    if(!upserts.length && !deletes.length) continue;
+    const ops = [];
+    current.forEach((json, id) => { if(previous.get(id) !== json) ops.push({ type:'set', id, json }); });
+    previous.forEach((_, id) => { if(!current.has(id)) ops.push({ type:'delete', id }); });
+    if(!ops.length) continue;
 
     try{
-      const col = cloudDb.collection('organisations').doc(currentOrgId()).collection(store.collection);
+      const col = ref.collection(store.collection);
       // Firestore caps a batch at 500 operations.
-      const ops = [...upserts.map(u => ({ type:'set', ...{ id:u[0], json:u[1] } })),
-                   ...deletes.map(id => ({ type:'delete', id }))];
       for(let i = 0; i < ops.length; i += 400){
         const batch = cloudDb.batch();
         ops.slice(i, i + 400).forEach(op => {
           if(op.type === 'delete') batch.delete(col.doc(op.id));
           else {
             const { id, ...fields } = JSON.parse(op.json);
-            batch.set(col.doc(op.id), { ...fields, updatedAt: Date.now() }, { merge: true });
+            batch.set(col.doc(op.id), { ...fields, updatedAt: Date.now() }, { merge:true });
           }
         });
         await batch.commit();
       }
-      _lastSynced[entity] = current;   // only advance the baseline on success
+      _lastSynced[entity] = current;   // advance the baseline only on success
     }catch(err){
       console.error(`Could not sync ${entity}:`, err);
-      if(err && err.code === 'permission-denied' && !SUBSCRIPTION_ACTIVE && !hasWarnedAboutBlockedSave){
-        hasWarnedAboutBlockedSave = true;
-        showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to save your changes.",
-          { title: 'Subscription needed' });
-      }
-      // Baseline deliberately not advanced: the same diff retries next save.
+      _reportWriteFailure(err);
     }
   }
 }
 
-/* Establishes the post-hydration baseline so the first save doesn't rewrite
-   every record. */
-function markEntitiesSynced(){
-  for(const [entity, store] of Object.entries(ENTITY_STORES)){
-    if(entityMode(entity) === 'v2') _lastSynced[entity] = _snapshot(DATA[store.dataKey]);
+function _reportWriteFailure(err){
+  if(err && err.code === 'permission-denied' && !SUBSCRIPTION_ACTIVE && !hasWarnedAboutBlockedSave){
+    hasWarnedAboutBlockedSave = true;
+    showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to save your changes.",
+      { title:'Subscription needed' });
   }
-}
-
-/* The single write path for CRM records.
-   action: 'create' | 'update' | 'delete'
-   Returns true on success, false if the write was refused. */
-async function persistEntity(entity, action, record){
-  const store = ENTITY_STORES[entity];
-  if(!store){
-    console.error('persistEntity: unknown entity', entity);
-    return false;
-  }
-  const mode = entityMode(entity);
-
-  if(mode === 'in_progress'){
-    await showAlert(
-      'This section is being upgraded in the background and is temporarily read-only. Please try again in a moment.',
-      { title: 'Upgrade in progress' }
-    );
-    return false;
-  }
-
-  // ---- legacy: unchanged original behaviour -------------------------------
-  if(mode === 'legacy'){
-    saveData(DATA);   // caller has already mutated DATA
-    return true;
-  }
-
-  // ---- v2: one document per record ---------------------------------------
-  const col = orgCollection(entity);
-  if(!col){
-    await showAlert('Not connected to your workspace right now — please refresh and try again.',
-      { title: 'Could not save' });
-    return false;
-  }
-  try{
-    if(action === 'delete'){
-      await col.doc(String(record.id)).delete();
-    }else{
-      const { id, ...fields } = record;
-      await col.doc(String(id)).set({ ...fields, updatedAt: Date.now() }, { merge: action === 'update' });
-    }
-    // DATA is already mutated by the caller and acts as the local read-model.
-    // Persist it to localStorage only — pushCloudData() strips migrated
-    // entities, so this cannot write them back into the legacy payload.
-    saveData(DATA);
-    return true;
-  }catch(err){
-    console.error(`Failed to ${action} ${entity}:`, err);
-    if(err && err.code === 'permission-denied'){
-      await showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to save your changes.",
-        { title: 'Subscription needed' });
-    }else{
-      await showAlert('Could not save that change — please try again.', { title: 'Save failed' });
-    }
-    return false;
-  }
-}
-
-/* Loads every migrated entity from Firestore into DATA, so the existing
-   render functions see a complete workspace regardless of which entities
-   have moved.
-
-   If a migrated entity fails to load we deliberately do NOT fall back to the
-   stale localStorage copy — a stale base could be written back over good v2
-   data. The entity is left empty and the failure surfaced. */
-async function hydrateMigratedEntities(){
-  if(!ORG_CONTEXT || !cloudDb) return;
-  const failures = [];
-
-  for(const [entity, store] of Object.entries(ENTITY_STORES)){
-    if(entityMode(entity) !== 'v2') continue;
-    try{
-      const snap = await cloudDb.collection('organisations').doc(currentOrgId())
-        .collection(store.collection).limit(5000).get();
-      DATA[store.dataKey] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    }catch(err){
-      console.error(`Could not load ${entity} from your workspace:`, err);
-      DATA[store.dataKey] = [];
-      failures.push(entity);
-    }
-  }
-  markEntitiesSynced();   // baseline from what we just loaded
-  if(failures.length){
-    showAlert(`Could not load: ${failures.join(', ')}. Please refresh — your data is safe, it just didn't load.`,
-      { title: 'Some data did not load' });
-  }
-}
-
-/* Runs every outstanding entity migration, chunk by chunk, until each is
-   done. Safe to call repeatedly: entities already on v2 return immediately,
-   and a locked entity is skipped rather than competing. */
-async function runPendingMigrations(onProgress){
-  if(!ORG_CONTEXT) return { ok:false, reason:'no organisation context' };
-  const entities = ['companies','contacts','deals','tasks','activities',
-                    'socialAccounts','calendarEvents','whatsapp','files','auditLogs'];
-  const summary = {};
-
-  // When the server reports a newer adapter version than the one this
-  // workspace was migrated with, already-migrated entities must be re-written
-  // by the corrected adapter — so don't skip them.
-  const needsRepair = !!(ORG_CONTEXT.adapterVersion && ORG_CONTEXT.storedAdapterVersion
-                         && ORG_CONTEXT.storedAdapterVersion < ORG_CONTEXT.adapterVersion);
-
-  for(const entity of entities){
-    if(entityMode(entity) === 'v2' && !needsRepair){ summary[entity] = 'already migrated'; continue; }
-    let guard = 0;   // bounds the loop even if the server never reports done
-    while(guard++ < 200){
-      let data;
-      try{
-        const res = await fetch(`${BACKEND_BASE}/api/organisation?action=migrate&entity=${encodeURIComponent(entity)}`, {
-          method:'POST', credentials:'include',
-          headers:{ 'X-CSRF-Token': getCsrfToken() }
-        });
-        data = await res.json();
-        if(!res.ok){ summary[entity] = `failed: ${data.error}`; break; }
-      }catch(err){
-        summary[entity] = `failed: ${err.message}`; break;
-      }
-      if(onProgress) onProgress(entity, data);
-      if(data.done){
-        summary[entity] = 'migrated';
-        if(ORG_CONTEXT.migration) ORG_CONTEXT.migration[entity] = 'v2';
-        break;
-      }
-      if(data.reason === 'locked'){ summary[entity] = 'locked by another run'; break; }
-    }
-  }
-  return { ok:true, summary };
 }

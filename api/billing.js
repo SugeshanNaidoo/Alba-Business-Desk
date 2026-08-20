@@ -185,10 +185,26 @@ async function handleDeleteAccount(req, res){
     await logEvent('account_deleted', { uid, ip });
     await deleteCollection(db, subRef.collection('payments'));
     await subRef.delete().catch(()=>{});
-    // Both collection names — the account must be fully erased regardless of
-    // whether this user's workspace has been copied forward yet.
-    await db.collection('albabusinessdesk_crm_users').doc(uid).delete().catch(()=>{});
-    await db.collection('flowline_crm_users').doc(uid).delete().catch(()=>{});
+    // Delete the user's organisation and everything under it. Subcollections
+    // are not removed by deleting the parent document in Firestore, so each
+    // is cleared explicitly.
+    try{
+      const userSnap = await db.collection('users').doc(uid).get();
+      const orgId = userSnap.exists ? userSnap.data().activeOrganisationId : null;
+      if(orgId){
+        const orgRef = db.collection('organisations').doc(orgId);
+        for(const sub of ['contacts','companies','deals','tasks','activities',
+                          'socialAccounts','socialSnapshots','socialPosts',
+                          'socialMentions','calendarEvents','files',
+                          'auditLogs','members','config']){
+          await deleteCollection(db, orgRef.collection(sub));
+        }
+        await orgRef.delete().catch(()=>{});
+      }
+      await db.collection('users').doc(uid).delete().catch(()=>{});
+    }catch(e){
+      console.error('Organisation cleanup during account deletion failed:', e.message);
+    }
     // Connections are per-customer now — clean up this account's own, not
     // a shared workspace-wide set that belongs to anyone else.
     const waConn = await db.collection('social_connections').doc(`${uid}_whatsapp`).get();

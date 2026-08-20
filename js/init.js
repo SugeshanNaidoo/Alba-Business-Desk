@@ -15,12 +15,9 @@ function renderAll(){
   renderSettings();
   renderNotifications();
 }
-/* First paint runs immediately from localStorage so the UI is never blank.
-   Organisation context resolves asynchronously in handleAuthChange(), which
-   calls pullCloudData() -> renderAll() again once it is known. Because every
-   entity is 'legacy' in Phase 2, this first render is already correct; the
-   ordering only starts to matter in Phase 4, when a re-render is required
-   after v2 entities hydrate. */
+/* First paint renders empty/default state immediately so the UI is never
+   blank; handleAuthChange() then resolves the organisation, loads the
+   workspace from Firestore and re-renders. */
 renderAll();
 
 /* Safety net: handleAuthChange normally hides this within moments of page
@@ -49,6 +46,6 @@ let lastActivityAt = Date.now();
 setInterval(()=>{
   if(!cloudUser) return; // nothing to time out for local-only use
   if(Date.now() - lastActivityAt < INACTIVITY_LIMIT_MS) return;
-  pushCloudData(); // make sure the latest changes are saved before signing out
+  if(typeof syncWorkspace === 'function') syncWorkspace(); // flush pending changes before signing out
   setTimeout(()=>{ endBackendSession(); if(cloudAuth) cloudAuth.signOut(); }, 800); // brief pause so the save can land
 }, 60 * 1000); // check once a minute

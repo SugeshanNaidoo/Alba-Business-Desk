@@ -10,7 +10,6 @@
 
 const { setCors } = require('../lib/util');
 const { getConnection, deleteConnection } = require('../lib/tokenStore');
-const { WORKSPACE_COLLECTION, readWorkspaceDoc } = require('../lib/orgContext');
 const { getDb } = require('../lib/firebaseAdmin');
 const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformFetchers');
 const { checkRateLimit } = require('../lib/rateLimit');
@@ -18,35 +17,7 @@ const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
 
-function newId(prefix){ return prefix + Date.now() + Math.floor(Math.random()*100000); }
 
-function mergePlatformData(crmData, platformName, result){
-  const platform = crmData.socialPlatforms.find(p=>p.name===platformName);
-  if(!platform) return;
-  if(typeof result.followers === 'number'){
-    platform.followers = result.followers;
-    crmData.socialSnapshots.push({ id: newId('ss'), platformId: platform.id, followers: result.followers, date: new Date().toISOString().slice(0,10) });
-  }
-  (result.posts||[]).forEach(p=>{
-    const exists = crmData.socialPosts.some(sp=>sp.externalId && sp.externalId===p.externalId && sp.platformId===platform.id);
-    if(exists) return;
-    crmData.socialPosts.push({
-      id: newId('post'), platformId: platform.id, externalId: p.externalId,
-      caption: p.caption||'', postedAt: p.postedAt||new Date().toISOString(),
-      likes: p.likes||0, comments: p.comments||0, shares: p.shares||0, reach: p.reach||null,
-      createdAt: Date.now()
-    });
-  });
-  (result.mentions||[]).forEach(m=>{
-    const exists = crmData.socialMentions.some(sm=>sm.externalId && sm.externalId===m.externalId && sm.platformId===platform.id);
-    if(exists) return;
-    crmData.socialMentions.push({
-      id: newId('m'), platformId: platform.id, externalId: m.externalId,
-      account: m.account||'Unknown', note: m.note||'', url: m.url||'',
-      date: m.date||new Date().toISOString().slice(0,10), createdAt: Date.now()
-    });
-  });
-}
 
 async function handlePlatformSync(req, res){
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -159,27 +130,72 @@ async function handleScheduled(req, res){
     for(const subDoc of activeSubs.docs){
       const uid = subDoc.id;
       try{
-        // Read via the dual-name helper so the nightly sync keeps working
-        // for users whose workspace has not been copied forward yet.
-        const docRef = db.collection(WORKSPACE_COLLECTION).doc(uid);
-        const { snap: doc } = await readWorkspaceDoc(db, uid);
-        if(!doc.exists || !doc.data().payload){
-          results.push({ uid, skipped: true, reason: 'No CRM data yet' });
+        // Resolve the user's organisation — social data now lives in its
+        // subcollections rather than a single workspace document.
+        const userSnap = await db.collection('users').doc(uid).get();
+        const orgId = userSnap.exists ? userSnap.data().activeOrganisationId : null;
+        if(!orgId){ results.push({ uid, skipped:true, reason:'No organisation' }); continue; }
+        const orgRef = db.collection('organisations').doc(orgId);
+        // Load the org's platform cards so fetched data can be attached to
+        // the right one.
+        const platSnap = await orgRef.collection('socialAccounts').get();
+        const platforms = platSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if(!platforms.length){
+          results.push({ uid, skipped: true, reason: 'No social platforms configured' });
           continue;
         }
-        const crmData = JSON.parse(doc.data().payload);
-        crmData.socialPlatforms = crmData.socialPlatforms || [];
-        crmData.socialSnapshots = crmData.socialSnapshots || [];
-        crmData.socialPosts = crmData.socialPosts || [];
-        crmData.socialMentions = crmData.socialMentions || [];
 
         const errors = [];
-        try{ mergePlatformData(crmData, 'Instagram', await fetchInstagram(uid)); } catch(e){ errors.push('Instagram: ' + e.message); }
-        try{ mergePlatformData(crmData, 'Facebook', await fetchFacebook(uid)); } catch(e){ errors.push('Facebook: ' + e.message); }
-        try{ mergePlatformData(crmData, 'TikTok', await fetchTikTok(uid)); } catch(e){ errors.push('TikTok: ' + e.message); }
+        const fetchers = { Instagram: fetchInstagram, Facebook: fetchFacebook, TikTok: fetchTikTok };
+        let writes = 0;
 
-        await docRef.set({ payload: JSON.stringify(crmData), updatedAt: Date.now() }, { merge: true });
-        results.push({ uid, ok: true, errors });
+        for(const [platformName, fetcher] of Object.entries(fetchers)){
+          const platform = platforms.find(p => p.name === platformName);
+          if(!platform) continue;
+          try{
+            const result = await fetcher(uid);
+            const batch = db.batch();
+
+            if(typeof result.followers === 'number'){
+              batch.set(orgRef.collection('socialAccounts').doc(platform.id),
+                { followers: result.followers, updatedAt: Date.now() }, { merge: true });
+              const snapId = `ss_${platform.id}_${new Date().toISOString().slice(0,10)}`;
+              batch.set(orgRef.collection('socialSnapshots').doc(snapId),
+                { id: snapId, platformId: platform.id, followers: result.followers,
+                  date: new Date().toISOString().slice(0,10) }, { merge: true });
+              writes += 2;
+            }
+            // externalId as the document id makes re-syncing idempotent —
+            // the same post updates in place instead of duplicating.
+            (result.posts || []).forEach(post => {
+              if(!post.externalId) return;
+              const id = `post_${platform.id}_${post.externalId}`;
+              batch.set(orgRef.collection('socialPosts').doc(id), {
+                id, platformId: platform.id, externalId: post.externalId,
+                caption: post.caption || '', postedAt: post.postedAt || new Date().toISOString(),
+                likes: post.likes || 0, comments: post.comments || 0,
+                shares: post.shares || 0, reach: post.reach || null,
+                updatedAt: Date.now()
+              }, { merge: true });
+              writes++;
+            });
+            (result.mentions || []).forEach(m => {
+              if(!m.externalId) return;
+              const id = `m_${platform.id}_${m.externalId}`;
+              batch.set(orgRef.collection('socialMentions').doc(id), {
+                id, platformId: platform.id, externalId: m.externalId,
+                account: m.account || 'Unknown', note: m.note || '', url: m.url || '',
+                date: m.date || new Date().toISOString().slice(0,10),
+                updatedAt: Date.now()
+              }, { merge: true });
+              writes++;
+            });
+
+            await batch.commit();
+          }catch(e){ errors.push(`${platformName}: ${e.message}`); }
+        }
+
+        results.push({ uid, ok: true, writes, errors });
       }catch(e){
         console.error(`Scheduled sync failed for uid=${uid}:`, e.message);
         results.push({ uid, ok: false, error: e.message });

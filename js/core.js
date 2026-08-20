@@ -16,12 +16,6 @@ const LEGACY_DB_KEY = 'flowline_crm_data_v1';       // pre-rename local cache
 const THEME_KEY = 'albabusinessdesk_theme';
 const LEGACY_THEME_KEY = 'flowline_theme';          // pre-rename theme key
 
-/* Firestore collection holding the legacy monolithic workspace document.
-   Both names exist because renaming a collection does not move data — the
-   backend copies each user forward on bootstrap, and the client falls back
-   to the old name if that copy has not happened yet. */
-const WORKSPACE_COLLECTION = 'albabusinessdesk_crm_users';
-const LEGACY_WORKSPACE_COLLECTION = 'flowline_crm_users';
 
 /* One-time local cache migration. Losing localStorage is survivable (the
    cloud copy is authoritative), but carrying it across avoids a pointless
@@ -124,112 +118,53 @@ let firebaseApp = null, cloudAuth = null, cloudDb = null, cloudUser = null, clou
 const STAGE_COLORS = ['stage-lead','stage-mid','stage-mid','stage-mid','stage-won','stage-lost'];
 
 function defaultData(){
-  const now = Date.now();
-  const day = 86400000;
+  /* Configuration defaults only. Entity collections start EMPTY — a new
+     workspace should not be pre-populated with invented contacts and deals;
+     the empty states guide the user instead. Entities are hydrated from
+     Firestore once the organisation is resolved. */
   return {
     settings:{ workspaceName:'Alba Business Desk' },
     stages:['Lead','Contacted','Proposal','Negotiation','Won','Lost'],
     contactStatuses:[
       {id:'st1',name:'Lead',category:'potential'},
       {id:'st2',name:'Client',category:'client'},
-      {id:'st3',name:'Past Client',category:'client'},
+      {id:'st3',name:'Past client',category:'client'},
       {id:'st4',name:'Partner',category:'other'},
-      {id:'st5',name:'Vendor',category:'other'}
+      {id:'st5',name:'Supplier',category:'other'}
     ],
     leadSources:[
       {id:'ls1',name:'Referral'},
       {id:'ls2',name:'Website'},
       {id:'ls3',name:'Social media'},
       {id:'ls4',name:'Cold outreach'},
-      {id:'ls5',name:'Trade show / event'},
+      {id:'ls5',name:'Event'},
       {id:'ls6',name:'Other'}
-    ],
-    companies:[
-      {id:'co1',name:'Coastal Retail Group',industry:'Retail',website:'',notes:'',createdAt:now-40*day},
-      {id:'co2',name:'Reddy & Sons Logistics',industry:'Logistics',website:'',notes:'',createdAt:now-12*day}
     ],
     customFieldDefs:{ contact:[], deal:[] },
     teamMembers:[
-      {id:'tm1',name:'Nomvula Zulu'},
-      {id:'tm2',name:'Sipho Dlamini'}
+      {id:'tm1',name:'You'}
     ],
     lostReasons:[
-      {id:'lr1',name:'Price'},{id:'lr2',name:'Bad timing'},{id:'lr3',name:'Chose a competitor'},
-      {id:'lr4',name:'No budget'},{id:'lr5',name:'Went cold / unresponsive'},{id:'lr6',name:'Other'}
+      {id:'lr1',name:'Price'},
+      {id:'lr2',name:'Timing'},
+      {id:'lr3',name:'Went with a competitor'},
+      {id:'lr4',name:'No budget'},
+      {id:'lr5',name:'No response'},
+      {id:'lr6',name:'Other'}
     ],
-    salesTargets:[
-      {id:'tg1',memberId:'team',period:'monthly',amount:90000,startDate:new Date(now).toISOString().slice(0,8)+'01'},
-      {id:'tg2',memberId:'tm1',period:'monthly',amount:55000,startDate:new Date(now).toISOString().slice(0,8)+'01'},
-      {id:'tg3',memberId:'tm2',period:'monthly',amount:35000,startDate:new Date(now).toISOString().slice(0,8)+'01'}
-    ],
-    contacts:[
-      {id:'c1',name:'Naledi Khumalo',company:'Coastal Retail Group',companyId:'co1',source:'ls5',email:'naledi@coastalretail.co.za',phone:'+27 82 555 0142',tag:'Client',notes:'Prefers email over calls. Decision maker for the Q3 refresh.',customFields:{},createdAt:now-40*day},
-      {id:'c2',name:'Michael Reddy',company:'Reddy & Sons Logistics',companyId:'co2',source:'ls5',email:'michael@reddylogistics.co.za',phone:'+27 71 555 0198',tag:'Lead',notes:'Met at the Durban trade expo.',customFields:{},createdAt:now-12*day},
-      {id:'c3',name:'Priya Naidoo',company:'Naidoo Consulting',companyId:null,source:'ls1',email:'priya@naidooconsulting.com',phone:'+27 83 555 0110',tag:'Partner',notes:'',customFields:{},createdAt:now-70*day},
-      {id:'c4',name:'Thabo Mokoena',company:'Mokoena Fresh Produce',companyId:null,source:'ls2',email:'thabo@mokoenafresh.co.za',phone:'+27 84 555 0177',tag:'Lead',notes:'Interested in the annual plan.',customFields:{},createdAt:now-3*day},
-      {id:'c5',name:'Sandra Govender',company:'Govender & Partners Law',companyId:null,source:'ls3',email:'sandra@govenderlaw.co.za',phone:'+27 82 555 0163',tag:'Past Client',notes:'Website project wrapped up last year — worth a check-in.',customFields:{},createdAt:now-400*day}
-    ],
-    deals:[
-      {id:'d1',title:'Brand refresh package',contactId:'c1',value:48000,stage:'Negotiation',priority:'high',probability:75,assignedTo:'tm1',lostReason:null,closeDate:new Date(now+9*day).toISOString().slice(0,10),customFields:{},createdAt:now-30*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-30*day},{stage:'Contacted',enteredAt:now-24*day},{stage:'Proposal',enteredAt:now-15*day},{stage:'Negotiation',enteredAt:now-5*day}]},
-      {id:'d2',title:'Fleet tracking dashboard',contactId:'c2',value:22000,stage:'Contacted',priority:'medium',probability:25,assignedTo:'tm2',lostReason:null,closeDate:new Date(now+21*day).toISOString().slice(0,10),customFields:{},createdAt:now-10*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-10*day},{stage:'Contacted',enteredAt:now-6*day}]},
-      {id:'d3',title:'Referral partnership',contactId:'c3',value:15000,stage:'Proposal',priority:'medium',probability:50,assignedTo:'tm1',lostReason:null,closeDate:new Date(now+14*day).toISOString().slice(0,10),customFields:{},createdAt:now-18*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-18*day},{stage:'Contacted',enteredAt:now-14*day},{stage:'Proposal',enteredAt:now-8*day}]},
-      {id:'d4',title:'Seasonal campaign site',contactId:'c4',value:9500,stage:'Lead',priority:'low',probability:10,assignedTo:'tm2',lostReason:null,closeDate:new Date(now+30*day).toISOString().slice(0,10),customFields:{},createdAt:now-2*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-2*day}]},
-      {id:'d5',title:'Loyalty app pilot',contactId:'c1',value:61000,stage:'Won',priority:'high',probability:100,assignedTo:'tm1',lostReason:null,closeDate:new Date(now-4*day).toISOString().slice(0,10),customFields:{},createdAt:now-55*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-55*day},{stage:'Contacted',enteredAt:now-48*day},{stage:'Proposal',enteredAt:now-35*day},{stage:'Negotiation',enteredAt:now-20*day},{stage:'Won',enteredAt:now-4*day}]},
-      {id:'d6',title:'Warehouse signage',contactId:'c2',value:6000,stage:'Lost',priority:'low',probability:0,assignedTo:'tm2',lostReason:'lr1',closeDate:new Date(now-10*day).toISOString().slice(0,10),customFields:{},createdAt:now-40*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-40*day},{stage:'Contacted',enteredAt:now-32*day},{stage:'Lost',enteredAt:now-10*day}]},
-      {id:'d7',title:'Firm website rebuild',contactId:'c5',value:34000,stage:'Won',priority:'medium',probability:100,assignedTo:'tm1',lostReason:null,closeDate:new Date(now-395*day).toISOString().slice(0,10),customFields:{},createdAt:now-430*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-430*day},{stage:'Proposal',enteredAt:now-420*day},{stage:'Won',enteredAt:now-395*day}]},
-      {id:'d8',title:'Delivery app redesign',contactId:'c2',value:41000,stage:'Lost',priority:'medium',probability:0,assignedTo:'tm1',lostReason:'lr3',closeDate:new Date(now-25*day).toISOString().slice(0,10),customFields:{},createdAt:now-60*day,
-        stageHistory:[{stage:'Lead',enteredAt:now-60*day},{stage:'Contacted',enteredAt:now-50*day},{stage:'Proposal',enteredAt:now-40*day},{stage:'Lost',enteredAt:now-25*day}]}
-    ],
-    tasks:[
-      {id:'t1',title:'Send revised proposal to Naledi',dueDate:new Date(now+1*day).toISOString().slice(0,10),priority:'high',done:false,relatedId:'d1',relatedType:'deal',recurrence:{type:'none',interval:1}},
-      {id:'t2',title:'Call Michael about timeline',dueDate:new Date(now-1*day).toISOString().slice(0,10),priority:'medium',done:false,relatedId:'c2',relatedType:'contact',recurrence:{type:'none',interval:1}},
-      {id:'t3',title:'Prep partnership deck',dueDate:new Date(now+5*day).toISOString().slice(0,10),priority:'medium',done:false,relatedId:'d3',relatedType:'deal',recurrence:{type:'none',interval:1}},
-      {id:'t4',title:'Send onboarding email',dueDate:new Date(now-6*day).toISOString().slice(0,10),priority:'low',done:true,relatedId:'c1',relatedType:'contact',recurrence:{type:'none',interval:1}},
-      {id:'t5',title:'Weekly pipeline review',dueDate:new Date(now+2*day).toISOString().slice(0,10),priority:'low',done:false,relatedId:null,relatedType:null,recurrence:{type:'weekly',interval:1}}
-    ],
-    activity:[
-      {id:'a1',text:'Marked "Loyalty app pilot" as Won',timestamp:now-4*day},
-      {id:'a2',text:'Added deal "Seasonal campaign site" for Thabo Mokoena',timestamp:now-2*day},
-      {id:'a3',text:'Moved "Brand refresh package" to Negotiation',timestamp:now-1*day},
-      {id:'a4',text:'Added contact Thabo Mokoena',timestamp:now-3*day}
-    ],
-    socialPlatforms:[
-      {id:'sp1',name:'Instagram',handle:'@yourstudio',followers:2840,createdAt:now-200*day},
-      {id:'sp2',name:'Facebook',handle:'Your Studio',followers:1120,createdAt:now-200*day}
-    ],
-    socialSnapshots:[
-      {id:'ss1',platformId:'sp1',followers:2600,date:new Date(now-60*day).toISOString().slice(0,10)},
-      {id:'ss2',platformId:'sp1',followers:2720,date:new Date(now-30*day).toISOString().slice(0,10)},
-      {id:'ss3',platformId:'sp1',followers:2840,date:new Date(now-2*day).toISOString().slice(0,10)},
-      {id:'ss4',platformId:'sp2',followers:1050,date:new Date(now-60*day).toISOString().slice(0,10)},
-      {id:'ss5',platformId:'sp2',followers:1120,date:new Date(now-2*day).toISOString().slice(0,10)}
-    ],
-    socialPosts:(function(){
-      function dt(daysAgo, hour){ const d = new Date(now - daysAgo*day); d.setHours(hour,0,0,0); return d.toISOString(); }
-      return [
-        {id:'post1',platformId:'sp1',caption:'New brand identity for a local client',postedAt:dt(2,19),likes:184,comments:22,shares:9,reach:3100,createdAt:now-2*day},
-        {id:'post2',platformId:'sp1',caption:'Studio tour behind the scenes',postedAt:dt(9,20),likes:210,comments:31,shares:14,reach:3600,createdAt:now-9*day},
-        {id:'post3',platformId:'sp1',caption:'Before/after website redesign',postedAt:dt(16,8),likes:96,comments:8,shares:3,reach:1900,createdAt:now-16*day},
-        {id:'post4',platformId:'sp1',caption:'Quick logo design tip',postedAt:dt(23,13),likes:74,comments:6,shares:2,reach:1500,createdAt:now-23*day},
-        {id:'post5',platformId:'sp2',caption:'Client testimonial video',postedAt:dt(5,18),likes:58,comments:11,shares:7,reach:1200,createdAt:now-5*day},
-        {id:'post6',platformId:'sp2',caption:'Portfolio highlight reel',postedAt:dt(12,9),likes:33,comments:3,shares:1,reach:800,createdAt:now-12*day},
-        {id:'post7',platformId:'sp1',caption:'Wednesday design roundup',postedAt:dt(3,19),likes:201,comments:27,shares:12,reach:3300,createdAt:now-3*day},
-        {id:'post8',platformId:'sp1',caption:'Client shoutout',postedAt:dt(19,14),likes:88,comments:9,shares:4,reach:1700,createdAt:now-19*day}
-      ];
-    })(),
-    socialMentions:[
-      {id:'m1',platformId:'sp1',account:'@coastalretailgroup',note:'Tagged us in their storefront reveal post',url:'',date:new Date(now-3*day).toISOString().slice(0,10),createdAt:now-3*day},
-      {id:'m2',platformId:'sp2',account:'Durban Business Network',note:'Mentioned Alba Designs in a "local studios to watch" roundup',url:'',date:new Date(now-14*day).toISOString().slice(0,10),createdAt:now-14*day}
-    ]
+    salesTargets:[],
+    companies:[],
+    contacts:[],
+    deals:[],
+    tasks:[],
+    activity:[],
+    socialPlatforms:[],
+    socialSnapshots:[],
+    socialPosts:[],
+    socialMentions:[]
   };
 }
+
 
 function loadData(){
   try{
@@ -283,19 +218,14 @@ function migrateData(d){
   return d;
 }
 function saveData(d){
-  localStorage.setItem(DB_KEY, JSON.stringify(d));
-  if(cloudUser && cloudDb){
+  // localStorage is a fast local cache only — Firestore is authoritative.
+  try{ localStorage.setItem(DB_KEY, JSON.stringify(d)); }catch(e){}
+  if(cloudUser && cloudDb && typeof syncWorkspace === 'function'){
     clearTimeout(cloudSaveTimer);
-    cloudSaveTimer = setTimeout(()=>{
-      // Legacy entities go to the monolithic payload (migrated keys are
-      // stripped inside pushCloudData). Migrated entities are diffed into
-      // their own subcollections. Both are no-ops when there is nothing of
-      // that kind to write, so this is safe in every migration state.
-      pushCloudData();
-      if(typeof syncMigratedEntities === 'function') syncMigratedEntities();
-    }, 600);
+    cloudSaveTimer = setTimeout(syncWorkspace, 600);
   }
 }
+
 let DATA = loadData();
 
 function logActivity(text, opts){

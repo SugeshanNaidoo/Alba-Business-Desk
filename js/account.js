@@ -307,94 +307,16 @@ document.getElementById('billingDeleteAccountBtn').addEventListener('click', asy
 })();
 
 let hasWarnedAboutBlockedSave = false;
-function pushCloudData(){
-  if(!cloudUser || !cloudDb) return;
-  // Entities that have migrated to their own subcollections are STRIPPED
-  // from the legacy payload before it is written. This is what makes it
-  // impossible for legacy persistence to resurrect a stale copy of migrated
-  // data: the legacy document simply never contains it.
-  //
-  // In Phase 2 every entity is 'legacy', so this removes nothing and the
-  // payload is byte-identical to what was written before.
-  const payload = { ...DATA };
-  const stripped = (typeof migratedPayloadKeys === 'function') ? migratedPayloadKeys() : [];
-  stripped.forEach(k => { delete payload[k]; });
 
-  cloudDb.collection(WORKSPACE_COLLECTION).doc(cloudUser.uid).set({
-    payload: JSON.stringify(payload),
-    migratedKeys: stripped,   // diagnostic: what this document no longer owns
-    updatedAt: Date.now()
-  }).then(()=>{
-    const el = document.getElementById('cloudSyncStatus');
-    if(el) el.textContent = 'Synced to the cloud.';
-  }).catch(err=>{
-    console.error(err);
-    const el = document.getElementById('cloudSyncStatus');
-    if(err && err.code === 'permission-denied'){
-      if(el) el.textContent = 'Changes are not being saved — subscribe to keep them.';
-      if(!SUBSCRIPTION_ACTIVE && !hasWarnedAboutBlockedSave){
-        hasWarnedAboutBlockedSave = true;
-        showAlert("You're exploring in view-only mode. Subscribe from the Billing tab to save your changes.", { title:'Subscription needed' });
-      }
-      return;
-    }
-    if(el) el.textContent = 'Cloud sync failed — your changes are still saved on this device.';
-  });
-}
-function pullCloudData(){
-  const el = document.getElementById('cloudSyncStatus');
-  // Returns the promise chain so the caller can sequence hydration after it.
-  /* Read the new collection, falling back to the pre-rename one.
-     WHY THIS FALLBACK IS ESSENTIAL: the backend copies each workspace
-     forward during bootstrap, but if that call failed (offline, backend
-     down), the new document will not exist yet. Without this fallback the
-     code below would treat an existing customer as a brand-new user and
-     reset them to defaultData() — silently destroying their workspace. */
-  return cloudDb.collection(WORKSPACE_COLLECTION).doc(cloudUser.uid).get()
-    .then(doc => (doc.exists && doc.data().payload)
-      ? doc
-      : cloudDb.collection(LEGACY_WORKSPACE_COLLECTION).doc(cloudUser.uid).get())
-    .then(doc=>{
-    if(doc.exists && doc.data().payload){
-      try{
-        const incoming = migrateData(JSON.parse(doc.data().payload));
-        // Apply ONLY the keys the legacy payload still owns. A migrated
-        // entity is authoritative in its subcollection, so even if an older
-        // client wrote a stale copy into the payload, it is ignored here.
-        const ignore = (typeof migratedPayloadKeys === 'function') ? migratedPayloadKeys() : [];
-        if(ignore.length){
-          ignore.forEach(k => { delete incoming[k]; });
-          DATA = Object.assign({}, DATA, incoming);   // keep already-hydrated v2 keys
-        } else {
-          DATA = incoming;                            // Phase 2 path: unchanged behaviour
-        }
-        saveData(DATA);
-        renderAll();
-      }catch(e){ console.error(e); }
-    } else {
-      // First time this account has signed in. Deliberately start from a
-      // clean default workspace rather than pushing up whatever happens to
-      // be sitting in this browser's local storage — on a shared or
-      // previously-used device, that could belong to someone else entirely.
-      DATA = defaultData();
-      saveData(DATA);
-      renderAll();
-      pushCloudData();
-    }
-    if(el) el.textContent = 'Synced to the cloud.';
-  }).catch(err=>{
-    console.error(err);
-    if(el) el.textContent = 'Could not reach the cloud — working from this device only.';
-  });
-}
+
 async function handleAuthChange(user){
   cloudUser = user || null;
   if(cloudUser){
     showSignedIn(cloudUser);
     // The backend session cookie must exist before the organisation
     // endpoint can authenticate us, and the organisation context must be
-    // known before workspace data loads — otherwise pullCloudData() cannot
-    // tell which entities the legacy payload still owns.
+    // known before the workspace loads, since every read and write is
+    // scoped to the organisation.
     await establishBackendSession();
     // Entitlement FIRST, before any data loading. SUBSCRIPTION_ACTIVE starts
     // false, and every gated action consults it — so if this runs late, a
@@ -402,38 +324,15 @@ async function handleAuthChange(user){
     // whole window. Resolve it as soon as the session exists.
     await refreshBilling();
     await initOrgContext();
-
-    // Bring any outstanding entity onto v2 storage automatically. This runs
-    // BEFORE the workspace is loaded so the app never renders from a store
-    // that is about to change underneath it.
-    //
-    // Safe to run on every sign-in: entities already on v2 return
-    // immediately, the server holds a per-entity lock so concurrent tabs
-    // cannot compete, and a failure leaves that entity on its existing
-    // storage rather than in a broken state.
-    //
-    // Requires an active subscription (the endpoint returns 402 otherwise),
-    // which is why entitlement is resolved above this point.
-    if(ORG_CONTEXT){
-      const loadingText = document.querySelector('.auth-loading-text');
-      try{
-        await runPendingMigrations((entity, data)=>{
-          if(loadingText && data && data.total){
-            loadingText.textContent = `Upgrading ${entity} — ${data.cursor || 0} of ${data.total}…`;
-          }
-        });
-      }catch(err){
-        console.error('Automatic workspace upgrade did not complete:', err);
-      }
-      if(loadingText) loadingText.textContent = "Just a whoo-ment — verifying it's you.";
-    }
-
     document.getElementById('authLoadingOverlay').classList.remove('active');
-    // Legacy payload first (it still owns any un-migrated entity), then
-    // overlay the migrated entities from their own subcollections — those
-    // are authoritative and must win.
-    await pullCloudData();
-    await hydrateMigratedEntities();
+    if(ORG_CONTEXT){
+      await loadWorkspace();
+    }else{
+      // No organisation resolved — surface it rather than silently showing an
+      // empty workspace that the user might then overwrite with saves.
+      await showAlert(orgContextError || 'Could not load your workspace. Please refresh.',
+        { title:'Workspace unavailable' });
+    }
     renderAll();
   } else {
     document.getElementById('authLoadingOverlay').classList.remove('active');
