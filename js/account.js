@@ -402,6 +402,32 @@ async function handleAuthChange(user){
     // whole window. Resolve it as soon as the session exists.
     await refreshBilling();
     await initOrgContext();
+
+    // Bring any outstanding entity onto v2 storage automatically. This runs
+    // BEFORE the workspace is loaded so the app never renders from a store
+    // that is about to change underneath it.
+    //
+    // Safe to run on every sign-in: entities already on v2 return
+    // immediately, the server holds a per-entity lock so concurrent tabs
+    // cannot compete, and a failure leaves that entity on its existing
+    // storage rather than in a broken state.
+    //
+    // Requires an active subscription (the endpoint returns 402 otherwise),
+    // which is why entitlement is resolved above this point.
+    if(ORG_CONTEXT){
+      const loadingText = document.querySelector('.auth-loading-text');
+      try{
+        await runPendingMigrations((entity, data)=>{
+          if(loadingText && data && data.total){
+            loadingText.textContent = `Upgrading ${entity} — ${data.cursor || 0} of ${data.total}…`;
+          }
+        });
+      }catch(err){
+        console.error('Automatic workspace upgrade did not complete:', err);
+      }
+      if(loadingText) loadingText.textContent = "Just a whoo-ment — verifying it's you.";
+    }
+
     document.getElementById('authLoadingOverlay').classList.remove('active');
     // Legacy payload first (it still owns any un-migrated entity), then
     // overlay the migrated entities from their own subcollections — those

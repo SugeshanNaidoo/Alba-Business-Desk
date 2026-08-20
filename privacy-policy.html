@@ -13,7 +13,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787239977">
+<link rel="stylesheet" href="policy.css?v=1787243795">
 </head>
 <body>
   <header class="policy-header">
@@ -187,11 +187,28 @@
       untouched.
     </p>
 
+    <h2 id="storage">7a. How your workspace data is stored</h2>
+    <p>
+      Workspace data is being moved from a single combined record per account
+      to individual records per item (each contact, deal and task stored
+      separately). This improves reliability and lets us apply finer-grained
+      access controls.
+    </p>
+    <p>
+      During this change a previous copy of your workspace is deliberately
+      retained so nothing can be lost if the upgrade needs to be reversed. It
+      is not used to serve the application once your data has been upgraded,
+      and it is deleted along with everything else if you delete your account.
+    </p>
+
     <h2 id="security">8. How we protect information</h2>
     <p>
-      Access to your data is restricted at the database level so only your own signed-in account
-      can read or write it, enforced by Firestore security rules rather than application logic
-      alone. Billing and subscription records can only ever be written by our verified backend,
+      Access to your data is restricted at the database level so only active members of your
+      workspace can read or write it, enforced by Firestore security rules rather than application
+      logic alone. Your role within the workspace determines what you may do, and that check
+      happens in the database itself — a read-only member cannot write data even if the interface
+      were bypassed. Paid features additionally verify the workspace's subscription at the database
+      level, not merely in the interface. Billing and subscription records can only ever be written by our verified backend,
       never directly by a user. Payment and WhatsApp webhook notifications are cryptographically
       verified before being trusted. We use HTTPS everywhere, and sensitive session cookies are
       marked HttpOnly and Secure so they cannot be read by page scripts or sent over an unencrypted
@@ -260,6 +277,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787239977"></script>
+  <script src="policy.js?v=1787243795"></script>
 </body>
 </html>
