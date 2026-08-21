@@ -13,7 +13,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="policy.css?v=1787258624">
+<link rel="stylesheet" href="policy.css?v=1787320542">
 </head>
 <body>
   <header class="policy-header">
@@ -68,7 +68,7 @@
     <p>
       We act as the <strong>responsible party</strong> for the account and billing information
       described below, and as an <strong>operator</strong> for the business data — contacts,
-      companies, deals, tasks, notes, and WhatsApp message content — that you or your organisation
+      companies, deals, tasks and notes — that you or your organisation
       enter into the CRM about your own customers. You remain the responsible party for that data.
     </p>
 
@@ -103,17 +103,6 @@
       to provide each feature, and each connection belongs to your account individually — it is
       never shared with anyone else using the platform.
     </p>
-    <h3>WhatsApp messages (optional)</h3>
-    <p>
-      If you connect a WhatsApp Business number, we store the credentials needed to send and
-      receive messages on your behalf, and we store the <strong>content of messages exchanged
-      with your contacts</strong> — both what they send you and what you send them — so the
-      conversation history is available in the contact's record. This is genuinely more sensitive
-      than follower counts or post engagement, since it's real conversation content, and it's
-      treated accordingly: message history is kept in its own restricted store, never exposed
-      through any public or unauthenticated channel, and only ever readable by your own signed-in
-      account.
-    </p>
     <h3>Workspace membership records</h3>
     <p>
       For each workspace you belong to we store your user ID, email address,
@@ -134,7 +123,7 @@
       <tr><td>Creating and securing your account</td><td>Necessary to provide the service you signed up for</td></tr>
       <tr><td>Storing your CRM data so the tool works</td><td>Necessary to provide the service you signed up for</td></tr>
       <tr><td>Processing your subscription payment</td><td>Necessary to perform our contract with you</td></tr>
-      <tr><td>Syncing connected social media, calendar, or WhatsApp data</td><td>Your explicit action in connecting an account, revocable at any time</td></tr>
+      <tr><td>Syncing connected social media or calendar data</td><td>Your explicit action in connecting an account, revocable at any time</td></tr>
       <tr><td>Detecting abuse and securing the platform</td><td>Our legitimate interest in keeping the service safe and available</td></tr>
       <tr><td>Keeping an audit trail of account and billing events</td><td>Our legitimate interest in being able to investigate disputes or incidents</td></tr>
     </table>
@@ -151,7 +140,7 @@
       <li><strong>Google Firebase / Google Cloud</strong> — authentication, database hosting (Firestore), and Google Calendar access where you've connected it</li>
       <li><strong>Vercel</strong> — hosting for the application and backend functions</li>
       <li><strong>PayFast</strong> — payment processing for subscriptions</li>
-      <li><strong>Meta</strong> (Facebook, Instagram, and WhatsApp Business Platform) and <strong>TikTok</strong> — only if you connect those accounts, to retrieve your own social media statistics or send and receive WhatsApp messages</li>
+      <li><strong>Meta</strong> (Facebook and Instagram) and <strong>TikTok</strong> — only if you connect those accounts, to retrieve your own social media statistics</li>
     </ul>
     <p>
       We do not sell personal information, and we do not share it with third parties for their own
@@ -177,7 +166,7 @@
     <ol>
       <li>Cancel any active subscription first, so you're never charged again;</li>
       <li>Delete your CRM data, payment history, and sign-in record;</li>
-      <li>Delete your connected social media, calendar, and WhatsApp credentials, and all stored WhatsApp message history;</li>
+      <li>Delete your connected social media and calendar credentials;</li>
       <li>Delete your workspace and every record in it — contacts, companies, deals, tasks, activity and settings;</li>
       <li>Retain a limited security audit log entry — that an account existed and was deleted, with a timestamp — for a reasonable period afterward, for fraud prevention and legal compliance.</li>
     </ol>
@@ -202,8 +191,13 @@
       logic alone. Your role within the workspace determines what you may do, and that check
       happens in the database itself — a read-only member cannot write data even if the interface
       were bypassed. Paid features additionally verify the workspace's subscription at the database
-      level, not merely in the interface. Billing and subscription records can only ever be written by our verified backend,
-      never directly by a user. Payment and WhatsApp webhook notifications are cryptographically
+      level, not merely in the interface. Records are validated on write for size and shape, and
+      your activity history is append-only: it can be added to, but not edited or deleted by any
+      client, so the record of what happened in your workspace stays trustworthy. For performance,
+      only recent activity is loaded when you sign in; the rest is retrieved on demand when you
+      open the relevant record or ask for older entries — nothing is deleted, it is simply not
+      fetched until needed. Billing and subscription records can only ever be written by our verified backend,
+      never directly by a user. Payment webhook notifications are cryptographically
       verified before being trusted. We use HTTPS everywhere, and sensitive session cookies are
       marked HttpOnly and Secure so they cannot be read by page scripts or sent over an unencrypted
       connection.
@@ -220,7 +214,7 @@
     <p>
       You can also <strong>withdraw consent for any connected integration at any time</strong>,
       without contacting us: the Settings → Connected accounts panel disconnects Facebook,
-      Instagram, TikTok, and WhatsApp, and the Calendar tab disconnects Google Calendar. Where the
+      Instagram and TikTok, and the Calendar tab disconnects Google Calendar. Where the
       platform supports it we ask them to revoke the access token as well, and the stored
       credentials are deleted from our side either way. Disconnecting stops future syncing; data
       already pulled into your workspace stays until you delete it.
@@ -271,6 +265,6 @@
     <a href="google-api-disclosure.html">Google API Disclosure</a> ·
     <a href="paia-manual.html">PAIA Manual</a>
   </footer>
-  <script src="policy.js?v=1787258624"></script>
+  <script src="policy.js?v=1787320542"></script>
 </body>
 </html>

@@ -232,7 +232,13 @@ function logActivity(text, opts){
   opts = opts || {};
   DATA.activity.unshift({id:'a'+Date.now()+Math.floor(Math.random()*1000), text, timestamp:Date.now(),
     type: opts.type || 'System', relatedType: opts.relatedType || null, relatedId: opts.relatedId || null});
-  DATA.activity = DATA.activity.slice(0,60);
+  // The old 60-entry cap existed because the whole workspace lived in one
+  // Firestore document with a 1 MB ceiling. Activity is now one document per
+  // record, so that constraint is gone — and worse, the cap actively DELETED
+  // history, because syncWorkspace() treats records missing from DATA as
+  // deletions. Kept at a high bound purely to keep the in-memory array and
+  // initial load reasonable.
+  DATA.activity = DATA.activity.slice(0, 2000);
 }
 /* Activity documents should always carry `text` and `timestamp` (see
    logActivity above). These accessors exist because a single malformed
@@ -301,18 +307,27 @@ function isDueToday(t){ return !t.done && toDateStr(t.dueDate) === new Date().to
 
 function renderNotifications(){
   const today = new Date().toISOString().slice(0,10);
-  const relevant = DATA.tasks.filter(t=>!t.done && toDateStr(t.dueDate) && toDateStr(t.dueDate)<=today)
-    .sort((a,b)=>byDateStr(a.dueDate, b.dueDate));
+  // Overdue and due-today, plus the next 3 days — a notification bell that
+  // only fires once something is already late isn't much of a warning.
+  const horizon = new Date(); horizon.setDate(horizon.getDate() + 3);
+  const horizonStr = horizon.toISOString().slice(0,10);
+  const relevant = DATA.tasks.filter(t=>{
+    const d = toDateStr(t.dueDate);
+    return !t.done && d && d <= horizonStr;
+  }).sort((a,b)=>byDateStr(a.dueDate, b.dueDate));
+  // The badge counts only overdue/due-today; upcoming items appear in the
+  // list but shouldn't make the bell look urgent.
+  const pressing = relevant.filter(t => toDateStr(t.dueDate) <= today).length;
   const badge = document.getElementById('notifBadge');
-  if(relevant.length){ badge.style.display='block'; badge.textContent = relevant.length>9?'9+':relevant.length; }
+  if(pressing){ badge.style.display='block'; badge.textContent = pressing>9?'9+':pressing; }
   else { badge.style.display='none'; }
 
   const dropdown = document.getElementById('notifDropdown');
   dropdown.innerHTML = relevant.length ? relevant.map(t=>`
     <div class="account-menu-item" data-notif-task="${t.id}" style="display:flex;justify-content:space-between;gap:10px;">
       <span>${escapeHtml(t.title)}</span>
-      <span style="${isOverdue(t)?'color:var(--clay);':'color:var(--graphite);'}font-size:11.5px;white-space:nowrap;">${fmtDate(t.dueDate)}</span>
-    </div>`).join('') : '<div class="account-menu-item" style="color:var(--graphite);cursor:default;">Nothing overdue or due today.</div>';
+      <span style="${isOverdue(t)?'color:var(--clay);':(isDueToday(t)?'color:var(--gold);':'color:var(--graphite);')}font-size:11.5px;white-space:nowrap;">${fmtDate(t.dueDate)}</span>
+    </div>`).join('') : '<div class="account-menu-item" style="color:var(--graphite);cursor:default;">Nothing due in the next few days.</div>';
   dropdown.querySelectorAll('[data-notif-task]').forEach(el=>{
     el.addEventListener('click', ()=>{
       dropdown.classList.remove('open');

@@ -8,231 +8,292 @@
     "These are not all needed until their corresponding migration phase ships.",
     "Deploying them early is harmless (an unused index costs only storage) and",
     "avoids the failure mode where a query 400s in production while the index",
-    "builds — index builds on a populated collection are not instant.",
+    "builds \u2014 index builds on a populated collection are not instant.",
     "",
     "Note on collectionGroup entries: 'messages' is a subcollection under each",
     "conversation, so any query spanning conversations requires a collection",
-    "group index rather than a collection index."
+    "group index rather than a collection index.",
+    "Single-field indexes are created automatically by Firestore in both directions and must NOT be listed here \u2014 the console rejects them as redundant. Only multi-field composites belong in this file."
   ],
-
   "indexes": [
     {
-      "//": "Phase 4 — contact list, newest-touched first, within one org.",
+      "//": "Phase 4 \u2014 contact list, newest-touched first, within one org.",
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 4 — paginated contact list ordered by name.",
+      "//": "Phase 4 \u2014 paginated contact list ordered by name.",
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "lastName", "order": "ASCENDING" },
-        { "fieldPath": "firstName", "order": "ASCENDING" }
+        {
+          "fieldPath": "lastName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "firstName",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 5 — contacts belonging to one company.",
+      "//": "Phase 5 \u2014 contacts belonging to one company.",
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "companyId", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
-
     {
-      "//": "Phase 6 — kanban board: deals in one stage, highest value first.",
+      "//": "Phase 6 \u2014 kanban board: deals in one stage, highest value first.",
       "collectionGroup": "deals",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "stage", "order": "ASCENDING" },
-        { "fieldPath": "value", "order": "DESCENDING" }
+        {
+          "fieldPath": "stage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "value",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 6 — 'my deals' view / per-rep reporting.",
+      "//": "Phase 6 \u2014 'my deals' view / per-rep reporting.",
       "collectionGroup": "deals",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "assignedTo", "order": "ASCENDING" },
-        { "fieldPath": "stage", "order": "ASCENDING" }
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "stage",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 6 — forecasting: open deals by expected close date.",
+      "//": "Phase 6 \u2014 forecasting: open deals by expected close date.",
       "collectionGroup": "deals",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "stage", "order": "ASCENDING" },
-        { "fieldPath": "expectedCloseDate", "order": "ASCENDING" }
+        {
+          "fieldPath": "stage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expectedCloseDate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 6 — deals linked to one contact (contact drawer).",
+      "//": "Phase 6 \u2014 deals linked to one contact (contact drawer).",
       "collectionGroup": "deals",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contactId", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "contactId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
-
     {
-      "//": "Phase 7 — open tasks by due date (the default Tasks view).",
+      "//": "Phase 7 \u2014 open tasks by due date (the default Tasks view).",
       "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "dueDate", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dueDate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 7 — tasks assigned to one member, soonest first.",
+      "//": "Phase 7 \u2014 tasks assigned to one member, soonest first.",
       "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "assignedTo", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "dueDate", "order": "ASCENDING" }
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dueDate",
+          "order": "ASCENDING"
+        }
       ]
     },
-
     {
-      "//": "Phase 8 — activity timeline for one contact (contact drawer).",
+      "//": "Filtered activity feed (e.g. calls only), newest first.",
       "collectionGroup": "activities",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contactId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 8 — activity timeline for one deal.",
-      "collectionGroup": "activities",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "dealId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "//": "Phase 8 — filtered activity feed (e.g. calls only).",
-      "collectionGroup": "activities",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-
-    {
-      "//": "Phase 9 — calendar month grid: events within a date window.",
+      "//": "Phase 9 \u2014 calendar month grid: events within a date window.",
       "collectionGroup": "calendarEvents",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "start", "order": "ASCENDING" },
-        { "fieldPath": "end", "order": "ASCENDING" }
+        {
+          "fieldPath": "start",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "end",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 9 — events linked to one contact.",
+      "//": "Phase 9 \u2014 events linked to one contact.",
       "collectionGroup": "calendarEvents",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contactId", "order": "ASCENDING" },
-        { "fieldPath": "start", "order": "ASCENDING" }
-      ]
-    },
-
-    {
-      "//": "Phase 11 — WhatsApp inbox: open conversations, most recent first.",
-      "collectionGroup": "conversations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "contactId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "start",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 11 — conversations assigned to one member.",
-      "collectionGroup": "conversations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "assignedTo", "order": "ASCENDING" },
-        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "//": "Phase 11 — collection group: find a conversation by phone number across the org (webhook inbound routing).",
-      "collectionGroup": "conversations",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "phoneNumber", "order": "ASCENDING" },
-        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "//": "Phase 11 — messages within a conversation, oldest first (thread view). Collection group because messages live under each conversation.",
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "direction", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
-      ]
-    },
-
-    {
-      "//": "Phase 12 — files attached to one contact.",
+      "//": "Phase 12 \u2014 files attached to one contact.",
       "collectionGroup": "files",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contactId", "order": "ASCENDING" },
-        { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "contactId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 12 — files attached to one deal.",
+      "//": "Phase 12 \u2014 files attached to one deal.",
       "collectionGroup": "files",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "dealId", "order": "ASCENDING" },
-        { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "dealId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
-
     {
-      "//": "Phase 13 — audit log filtered by action type, newest first.",
+      "//": "Phase 13 \u2014 audit log filtered by action type, newest first.",
       "collectionGroup": "auditLogs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "action", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "action",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "//": "Phase 13 — audit log for one member's actions.",
+      "//": "Phase 13 \u2014 audit log for one member's actions.",
       "collectionGroup": "auditLogs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "performedBy", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "performedBy",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
-
     {
-      "//": "Phase 2 — find every organisation a user belongs to (org switcher). Collection group across all members subcollections.",
+      "//": "Phase 2 \u2014 find every organisation a user belongs to (org switcher). Collection group across all members subcollections.",
       "collectionGroup": "members",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "uid", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" }
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "loadActivityFor() \u2014 a record's own timeline, newest first.",
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "relatedType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "relatedId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
-
   "fieldOverrides": []
 }

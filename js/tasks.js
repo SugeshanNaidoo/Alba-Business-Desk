@@ -32,7 +32,14 @@ function renderTasks(){
 }
 
 function advanceDate(dateStr, recurrence){
-  const d = dateStr ? new Date(dateStr) : new Date();
+  // Advance from the due date, or from today if that date has already passed.
+  // Otherwise completing a task that was three weeks overdue would schedule
+  // its "next" occurrence two weeks in the past, where it appears instantly
+  // overdue again.
+  const base = toDateStr(dateStr);
+  const today = new Date().toISOString().slice(0,10);
+  const d = new Date((base && base > today) ? base : today);
+  if(isNaN(d.getTime())) return today;
   if(recurrence.type==='daily') d.setDate(d.getDate()+ (recurrence.interval||1));
   else if(recurrence.type==='weekly') d.setDate(d.getDate()+ 7*(recurrence.interval||1));
   else if(recurrence.type==='monthly') d.setMonth(d.getMonth()+ (recurrence.interval||1));
@@ -45,10 +52,16 @@ document.addEventListener('change', e=>{
     if(t){
       t.done = e.target.checked;
       if(t.done && t.recurrence && t.recurrence.type!=='none'){
+        // Carry the WHOLE task forward. The previous version rebuilt it from
+        // six fields, silently dropping notes, assignee and any linked deal
+        // or contact on every recurrence.
+        const { id, done, createdAt, updatedAt, ...carried } = t;
         DATA.tasks.push({
-          id:uid('t'), title:t.title, priority:t.priority, done:false,
-          relatedId:t.relatedId, relatedType:t.relatedType, recurrence:t.recurrence,
-          dueDate: advanceDate(t.dueDate, t.recurrence)
+          ...carried,
+          id: uid('t'),
+          done: false,
+          dueDate: advanceDate(t.dueDate, t.recurrence),
+          createdAt: Date.now()
         });
         logActivity(`Scheduled next occurrence of "${t.title}"`);
       }

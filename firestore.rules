@@ -21,8 +21,6 @@ rules_version = '2';
 //                                  covers all platform names.
 //   /audit_logs/{logId}         — security event trail, backend-only.
 //   /rate_limits/{key}          — rate limiter counters, backend-only.
-//   /whatsapp_messages/{id}, /whatsapp_message_status/{id},
-//   /whatsapp_phone_lookup/{phoneNumberId} — WhatsApp chat data, backend-only.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -154,50 +152,67 @@ service cloud.firestore {
              && orgIsSubscribed(orgId);
     }
 
+    /* Size guard. Firestore's own limit is 1 MB per document, which is far
+       larger than any legitimate CRM record. Capping the field count and
+       string lengths well below that means a compromised or buggy client
+       cannot quietly inflate storage costs, and keeps a single malformed
+       write from becoming an expensive document. */
+    function isReasonableSize() {
+      return request.resource.data.keys().size() < 120;
+    }
+    /* Records must not claim to belong to another organisation or carry
+       server-managed fields the client has no business setting. */
+    function noServerFields() {
+      return !request.resource.data.keys().hasAny(['orgId', 'ownerId', 'subscription', 'role', 'status_internal']);
+    }
+    function validCrmWrite(orgId) {
+      return canWriteCrm(orgId) && isReasonableSize() && noServerFields();
+    }
+
     /* Workspace configuration — stages, statuses, custom field definitions,
        targets. Bounded and always read together, so one document. */
     match /organisations/{orgId}/config/{docId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/socialSnapshots/{snapId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/socialPosts/{postId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/socialMentions/{mentionId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/contacts/{contactId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/companies/{companyId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/deals/{dealId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/tasks/{taskId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/activities/{activityId} {
       allow read:   if isActiveMember(orgId);
       // Append-only: an activity is a historical record. Editing or deleting
       // history is not a client capability.
-      allow create: if canWriteCrm(orgId);
+      allow create: if validCrmWrite(orgId);
       allow update, delete: if false;
     }
     match /organisations/{orgId}/calendarEvents/{eventId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
 
     /* Integration metadata. Readable so the UI can show connection status;
@@ -209,24 +224,11 @@ service cloud.firestore {
        this tree, so no membership rule can ever expose them. */
     match /organisations/{orgId}/socialAccounts/{accountId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
-    }
-    match /organisations/{orgId}/whatsappAccounts/{accountId} {
-      allow read:  if isActiveMember(orgId);
-      allow write: if false;
-    }
-    /* WhatsApp conversations and messages are written by the webhook and the
-       send route (Admin SDK). Clients read through the authenticated API,
-       not directly, so both are denied here. */
-    match /organisations/{orgId}/conversations/{conversationId} {
-      allow read, write: if false;
-    }
-    match /organisations/{orgId}/conversations/{conversationId}/messages/{messageId} {
-      allow read, write: if false;
+      allow write: if validCrmWrite(orgId);
     }
     match /organisations/{orgId}/files/{fileId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if canWriteCrm(orgId);
+      allow write: if validCrmWrite(orgId);
     }
     /* Security history: server-written only, and readable only by
        owner/admin. A member must not be able to inspect or forge the trail. */
@@ -261,23 +263,6 @@ service cloud.firestore {
     match /rate_limits/{key} {
       allow read, write: if false;
     }
-
-    // WhatsApp chat: message history, delivery status, and the
-    // phone-number-to-account lookup the webhook uses. All backend-only —
-    // the CRM reads messages through the authenticated /api/whatsapp
-    // endpoint, never directly via the client SDK.
-    match /whatsapp_messages/{messageId} {
-      allow read, write: if false;
-    }
-    match /whatsapp_message_status/{statusId} {
-      allow read, write: if false;
-    }
-    match /whatsapp_phone_lookup/{phoneNumberId} {
-      allow read, write: if false;
-    }
-
-    // Deny everything else by default — this stops any future collection
-    // from being open unless a rule is deliberately added for it.
     match /{document=**} {
       allow read, write: if false;
     }

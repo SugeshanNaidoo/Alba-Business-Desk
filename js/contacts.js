@@ -247,8 +247,14 @@ function openDrawer(contactId){
     <div class="info-row"><span>${escapeHtml(d.title)} <span class="topbar-sub" style="font-size:11px;">(${d.stage})</span></span><span>${fmtMoney(d.value)}</span></div>
   `).join('') : '<p class="topbar-sub">No deals yet.</p>';
   renderContactActivityTimeline(contactId);
+  // The feed holds only a recent page, so fetch this contact's own history
+  // and re-render once it arrives.
+  if(typeof loadActivityFor === 'function'){
+    loadActivityFor('contact', contactId).then(added => {
+      if(added) renderContactActivityTimeline(contactId);
+    });
+  }
   document.getElementById('drawerEditBtn').onclick = ()=>{ closeDrawer(); openContactModal(c.id); };
-  initWhatsappPanelForContact(c);
   document.getElementById('contactDrawer').classList.add('active');
   document.getElementById('drawerOverlay').classList.add('active');
 }
@@ -267,7 +273,6 @@ document.getElementById('contactLogAddBtn').addEventListener('click',()=>{
 function closeDrawer(){
   document.getElementById('contactDrawer').classList.remove('active');
   document.getElementById('drawerOverlay').classList.remove('active');
-  stopWhatsappPolling();
 }
 document.getElementById('drawerClose').addEventListener('click', closeDrawer);
 document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);

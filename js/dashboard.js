@@ -1,3 +1,7 @@
+/* How many activity entries the dashboard feed shows. Grows as older pages
+   are loaded — the feed starts at 8 so it stays a summary, not a wall. */
+let activityFeedLimit = 8;
+
 // Dashboard tab.
 
 /* ---------- Render: Dashboard ---------- */
@@ -38,7 +42,9 @@ function renderDashboard(){
 
   renderRiver();
 
-  document.getElementById('activityList').innerHTML = DATA.activity.slice(0,8).map(a=>`
+  const btn = document.getElementById('loadMoreActivityBtn');
+  if(btn) btn.style.display = (typeof activityHasMore === 'function' && activityHasMore()) ? 'inline-flex' : 'none';
+  document.getElementById('activityList').innerHTML = DATA.activity.slice(0, activityFeedLimit).map(a=>`
     <div class="activity-row">
       <div class="activity-dot"></div>
       <div><div class="activity-text">${escapeHtml(activityText(a))}</div><div class="activity-time">${timeAgo(activityTime(a))}</div></div>
@@ -81,3 +87,14 @@ function renderRiver(){
   document.getElementById('riverSvg').innerHTML = svg;
 }
 
+
+
+document.getElementById('loadMoreActivityBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('loadMoreActivityBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  const res = await loadMoreActivity();
+  activityFeedLimit += 25;
+  btn.disabled = false; btn.textContent = 'Load older activity';
+  renderDashboard();
+  if(!res.hasMore) btn.style.display = 'none';
+});

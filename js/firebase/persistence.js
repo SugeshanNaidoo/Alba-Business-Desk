@@ -33,6 +33,17 @@ const ENTITY_STORES = {
 const CONFIG_KEYS = ['settings','stages','contactStatuses','leadSources',
                      'customFieldDefs','teamMembers','lostReasons','salesTargets'];
 
+/* Entities the rules treat as append-only history: create is allowed, update
+   and delete are denied. The sync must respect that, or every save would
+   issue writes the rules reject and retry them forever. */
+const APPEND_ONLY = new Set(['activities']);
+
+const ACTIVITY_PAGE_SIZE = 50;   // recent activity fetched on first paint
+const ENTITY_LOAD_LIMIT  = 5000; // per-collection ceiling for everything else
+
+let _activityCursor = null;      // last doc of the loaded activity page
+let _activityHasMore = false;
+
 const _lastSynced = {};        // entity -> Map(id -> serialised record)
 let _lastConfig = null;        // serialised config, to detect changes
 
@@ -100,6 +111,7 @@ async function loadWorkspace(){
   if(!ref) return { ok:false, reason:'no organisation' };
 
   const failures = [];
+  const truncated = [];
 
   // Configuration.
   try{
@@ -117,8 +129,30 @@ async function loadWorkspace(){
   // Entity collections.
   for(const [entity, store] of Object.entries(ENTITY_STORES)){
     try{
-      const snap = await ref.collection(store.collection).limit(5000).get();
+      // Activity is the largest collection by far and almost none of it is
+      // needed on first paint. Load only the most recent page; older entries
+      // arrive via loadMoreActivity(), and a specific record's full history
+      // via loadActivityFor() when its drawer opens.
+      let query = ref.collection(store.collection);
+      if(entity === 'activities'){
+        query = query.orderBy('timestamp', 'desc').limit(ACTIVITY_PAGE_SIZE);
+      } else {
+        query = query.limit(ENTITY_LOAD_LIMIT);
+      }
+      const snap = await query.get();
       DATA[store.dataKey] = snap.docs.map(d => normaliseRecord(entity, { id: d.id, ...d.data() }));
+      if(entity === 'activities'){
+        _activityCursor = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
+        _activityHasMore = snap.docs.length === ACTIVITY_PAGE_SIZE;
+      } else if(snap.docs.length === ENTITY_LOAD_LIMIT){
+        // Silent truncation would make the app look fine while quietly
+        // hiding records. Say so instead.
+        console.warn(`${entity}: hit the ${ENTITY_LOAD_LIMIT}-record load limit — some records were not loaded.`);
+        truncated.push(entity);
+      }
+      if(entity === 'socialSnapshots'){
+        DATA[store.dataKey].sort((a,b) => String(a.date||'').localeCompare(String(b.date||'')));
+      }
       _lastSynced[entity] = _snapshot(DATA[store.dataKey]);
     }catch(err){
       console.error(`Could not load ${entity}:`, err);
@@ -134,7 +168,78 @@ async function loadWorkspace(){
       { title:'Some data did not load' });
     return { ok:false, failures };
   }
-  return { ok:true };
+  if(truncated.length){
+    showAlert(`You have more ${truncated.join(' and ')} than this view can load at once (${ENTITY_LOAD_LIMIT}). Everything is safely stored — get in touch and we'll raise the limit.`,
+      { title:'Large workspace' });
+  }
+  return { ok:true, truncated };
+}
+
+/* Merges fetched activity into DATA without duplicating, keeping the array
+   sorted newest-first. Used by both pagination and per-record fetches. */
+function _mergeActivity(records){
+  const seen = new Set(DATA.activity.map(a => String(a.id)));
+  let added = 0;
+  records.forEach(r => {
+    if(seen.has(String(r.id))) return;
+    DATA.activity.push(r);
+    seen.add(String(r.id));
+    added++;
+  });
+  DATA.activity.sort((a,b) => (Number(b.timestamp)||0) - (Number(a.timestamp)||0));
+  // Newly merged records already exist in Firestore. Fold them into the sync
+  // baseline so the next save doesn't try to re-create them — activities are
+  // append-only, so a re-create would be rejected.
+  if(added && _lastSynced.activities){
+    _lastSynced.activities = _snapshot(DATA.activity);
+  }
+  return added;
+}
+
+/* Fetches the next page of older activity for the dashboard feed. */
+async function loadMoreActivity(){
+  const ref = orgRef();
+  if(!ref || !_activityHasMore) return { added:0, hasMore:false };
+  try{
+    let q = ref.collection('activities').orderBy('timestamp','desc').limit(ACTIVITY_PAGE_SIZE);
+    if(_activityCursor) q = q.startAfter(_activityCursor);
+    const snap = await q.get();
+    const added = _mergeActivity(snap.docs.map(d => normaliseRecord('activities', { id:d.id, ...d.data() })));
+    _activityCursor = snap.docs.length ? snap.docs[snap.docs.length-1] : _activityCursor;
+    _activityHasMore = snap.docs.length === ACTIVITY_PAGE_SIZE;
+    return { added, hasMore:_activityHasMore };
+  }catch(err){
+    console.error('Could not load more activity:', err);
+    return { added:0, hasMore:_activityHasMore, error:err.message };
+  }
+}
+function activityHasMore(){ return _activityHasMore; }
+
+/* Fetches ALL activity for one contact or deal.
+
+   Without this, paginating the feed would silently shorten every record's
+   timeline — the drawer filters DATA.activity, which now holds only a recent
+   page. This queries the record's own history directly so the timeline stays
+   complete regardless of how much of the feed is loaded. */
+const _activityFetched = new Set();
+async function loadActivityFor(relatedType, relatedId){
+  const ref = orgRef();
+  if(!ref || !relatedId) return 0;
+  const key = `${relatedType}:${relatedId}`;
+  if(_activityFetched.has(key)) return 0;   // already have it this session
+  try{
+    const snap = await ref.collection('activities')
+      .where('relatedType','==',relatedType)
+      .where('relatedId','==',relatedId)
+      .orderBy('timestamp','desc').limit(200).get();
+    _activityFetched.add(key);
+    return _mergeActivity(snap.docs.map(d => normaliseRecord('activities', { id:d.id, ...d.data() })));
+  }catch(err){
+    // A missing composite index surfaces here. The timeline still shows
+    // whatever is already loaded rather than breaking.
+    console.error('Could not load activity for', key, err);
+    return 0;
+  }
 }
 
 /* Writes DATA back to Firestore by diffing against the last known state.
@@ -166,10 +271,20 @@ async function syncWorkspace(){
     const previous = _lastSynced[entity];
     if(!previous){ _lastSynced[entity] = current; continue; }   // no baseline yet
 
+    const appendOnly = APPEND_ONLY.has(entity);
     const ops = [];
-    current.forEach((json, id) => { if(previous.get(id) !== json) ops.push({ type:'set', id, json }); });
-    previous.forEach((_, id) => { if(!current.has(id)) ops.push({ type:'delete', id }); });
-    if(!ops.length) continue;
+    current.forEach((json, id) => {
+      if(previous.get(id) === json) return;
+      // For append-only entities only genuinely NEW records may be written.
+      // An edit to an existing one would be rejected by the rules, so it is
+      // skipped rather than retried on every subsequent save.
+      if(appendOnly && previous.has(id)) return;
+      ops.push({ type:'set', id, json, isNew: !previous.has(id) });
+    });
+    if(!appendOnly){
+      previous.forEach((_, id) => { if(!current.has(id)) ops.push({ type:'delete', id }); });
+    }
+    if(!ops.length){ _lastSynced[entity] = current; continue; }
 
     try{
       const col = ref.collection(store.collection);
@@ -180,7 +295,8 @@ async function syncWorkspace(){
           if(op.type === 'delete') batch.delete(col.doc(op.id));
           else {
             const { id, ...fields } = JSON.parse(op.json);
-            batch.set(col.doc(op.id), { ...fields, updatedAt: Date.now() }, { merge:true });
+            batch.set(col.doc(op.id), { ...fields, updatedAt: Date.now() },
+              appendOnly ? {} : { merge:true });
           }
         });
         await batch.commit();

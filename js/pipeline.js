@@ -120,7 +120,13 @@ function openDealModal(id, presetStage){
   document.getElementById('deleteDealBtn').style.display = d ? 'inline-flex' : 'none';
   document.getElementById('dealActivitySection').style.display = d ? 'block' : 'none';
   renderCustomFieldsForm(document.getElementById('dCustomFieldsContainer'), 'deal', d ? d.customFields : {});
-  if(d) renderDealActivityTimeline(d.id);
+  if(d){
+    renderDealActivityTimeline(d.id);
+    // The feed holds only a recent page — fetch this deal's own history.
+    if(typeof loadActivityFor === 'function'){
+      loadActivityFor('deal', d.id).then(added => { if(added) renderDealActivityTimeline(d.id); });
+    }
+  }
   document.getElementById('dealModalOverlay').classList.add('active');
 }
 document.getElementById('dProbability').addEventListener('input', e=>{

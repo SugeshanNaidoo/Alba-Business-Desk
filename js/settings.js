@@ -13,7 +13,6 @@ document.querySelectorAll('#settingsSubNav .settings-subnav-item').forEach(item=
 function renderSettings(){
   document.getElementById('settingsWorkspaceName').value = DATA.settings.workspaceName;
   refreshConnectionStatus();
-  refreshWhatsappSettingsStatus();
   renderStatusEditor();
   renderSourceEditor();
   renderCustomFieldEditor('contact');
