@@ -175,8 +175,11 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
   color:var(--ink);
   display:flex;
   flex-direction:column;
-  padding:calc(16px + var(--safe-t)) 12px calc(16px + var(--safe-b)) calc(12px + var(--safe-l));
-  overflow-y:auto;
+  padding:calc(14px + var(--safe-t)) 12px calc(14px + var(--safe-b)) calc(12px + var(--safe-l));
+  /* The sidebar never scrolls as a whole — brand, theme toggle and account
+     chip stay pinned. Only .nav scrolls, and only if the item list is
+     genuinely taller than the space available. */
+  overflow:hidden;
   overscroll-behavior:contain;
   transform:translateX(-102%);
   transition:transform .28s cubic-bezier(.32,.72,0,1);
@@ -192,19 +195,28 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
 }
 .sidebar-backdrop.active{display:block;}
 
-.brand{display:flex;align-items:center;gap:9px;padding:6px 8px 20px;min-width:0;}
-.brand-logo{height:40px;width:auto;max-width:100%;object-fit:contain;transition:opacity .15s ease;}
+.brand{display:flex;align-items:center;gap:9px;padding:2px 8px 14px;min-width:0;flex-shrink:0;}
+.brand-logo{height:34px;width:auto;max-width:100%;object-fit:contain;transition:opacity .15s ease;}
 /* flex-grow to push the account block to the bottom on tall screens, but
    flex-shrink:0 so the nav can never be squeezed below its natural height.
    With min-height:0 it would shrink while its items stayed full size,
    spilling over and covering the account chip (and the sign-out inside it).
    The sidebar scrolls instead. */
-.nav{display:flex;flex-direction:column;gap:2px;flex:1 0 auto;}
+.nav{
+  display:flex;flex-direction:column;gap:1px;
+  /* flex:1 1 auto + min-height:0 is what allows this to shrink and scroll.
+     It was previously flex:1 0 auto (shrink disabled), which forced the whole
+     sidebar to overflow instead — the actual cause of the sidebar scrollbar. */
+  flex:1 1 auto;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none;}
 .nav-item{
   display:flex;align-items:center;gap:11px;
-  padding:9px 10px;border-radius:var(--radius-sm);
+  padding:7px 10px;border-radius:var(--radius-sm);
   color:var(--graphite);
-  font-size:14px;font-weight:520;
+  font-size:13.5px;font-weight:520;
   cursor:pointer;border:none;background:none;
   text-align:left;width:100%;
   transition:background-color .15s ease, color .15s ease;
@@ -216,13 +228,13 @@ body, .panel, .sidebar, .topbar, .card, .btn, input, select, textarea{
 .nav-item.active{background:var(--active-surface);color:var(--ink);font-weight:600;}
 .nav-foot{
   border-top:1px solid var(--line);
-  padding-top:10px;margin-top:10px;
-  font-size:11px;color:var(--graphite-soft);
-  word-break:break-word;
+  padding-top:8px;margin-top:8px;
+  font-size:10.5px;line-height:1.6;color:var(--graphite-soft);
+  word-break:break-word;flex-shrink:0;
 }
 .nav-foot a{color:inherit;}
 
-.sidebar-account{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);position:relative;}
+.sidebar-account{margin-top:8px;padding-top:8px;flex-shrink:0;border-top:1px solid var(--line);position:relative;}
 .account-chip{
   display:flex;align-items:center;gap:9px;
   padding:7px 8px;border-radius:var(--radius-sm);
@@ -840,7 +852,7 @@ tbody tr:hover{background:var(--hover-surface);}
    in the sidebar, where vertical space is the scarce resource. Slimming it
    is usually enough to keep the sidebar from needing to scroll at all. */
 .theme-toggle-row{
-  display:flex;gap:2px;align-items:stretch;
+  display:flex;gap:2px;align-items:stretch;flex-shrink:0;
   padding:2px;background:var(--control-track);
   border-radius:100px;margin-top:8px;
 }
@@ -1059,7 +1071,7 @@ tbody tr:hover{background:var(--hover-surface);}
     will-change:auto;          /* only needed for the mobile slide-in */
     width:var(--sidebar-w);
     background:var(--sidebar-glass);
-    padding:20px 14px;
+    padding:16px 14px;   /* matches the trimmed mobile padding */
     transition:none;
   }
   .sidebar.open{transform:none;}

@@ -51,7 +51,21 @@ async function handleLogout(req, res){
     try{
       const decoded = await getAdmin().auth().verifySessionCookie(sessionCookie).catch(()=>null);
       if(decoded){
-        await getAdmin().auth().revokeRefreshTokens(decoded.uid).catch(()=>{});
+        // NOT revoking refresh tokens here, deliberately.
+        //
+        // revokeRefreshTokens() sets a revocation timestamp, and
+        // verifySessionCookie(cookie, true) rejects any cookie whose
+        // auth_time precedes it. auth_time is when the user last actually
+        // AUTHENTICATED — not when the token was minted — so refreshing the
+        // ID token does not move it. If Firebase silently restores the
+        // session on the next visit (no fresh credential prompt), auth_time
+        // stays behind the revocation and EVERY session cookie is rejected
+        // permanently: auth/session-cookie-revoked on every request.
+        //
+        // Deleting the session cookie below already ends this session, which
+        // is what sign-out means. Revocation is for security-sensitive
+        // events — password change, suspected compromise, account deletion —
+        // and account deletion still revokes, in api/billing.js.
         await logEvent('session_logout', { uid: decoded.uid, ip: clientIp(req) });
       }
     }catch(e){ /* best effort — still clear cookies below either way */ }

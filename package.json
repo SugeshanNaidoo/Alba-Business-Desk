@@ -1,7 +1,7 @@
 {
-  "name": "flowline-crm-social-integrations",
+  "name": "alba-business-desk-api",
   "private": true,
   "dependencies": {
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^13.0.0"
   }
 }

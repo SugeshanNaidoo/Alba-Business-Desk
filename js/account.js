@@ -51,6 +51,22 @@ async function establishBackendSession(){
       console.error('Backend session could not be established:', res.status);
       return false;
     }
+    // Confirm the cookie actually verifies. A cookie can be minted
+    // successfully and still be rejected — if refresh tokens were revoked
+    // after this user last authenticated, auth_time predates the revocation
+    // and no amount of token refreshing fixes it. Only a genuine
+    // re-authentication moves auth_time forward.
+    try{
+      const check = await fetch(`${base}/api/organisation?action=context`, { credentials:'include' });
+      if(check.status === 401 && !_reauthPrompted){
+        _reauthPrompted = true;
+        await showAlert('Your sign-in needs refreshing for security. Please sign in again — this is a one-off.',
+          { title:'Please sign in again' });
+        await endBackendSession();
+        if(cloudAuth) await cloudAuth.signOut();
+        return false;
+      }
+    }catch(e){ /* network hiccup — leave the session as established */ }
     return true;
   }catch(err){
     console.error('Could not establish a backend session — billing features may be unavailable.', err);
@@ -64,6 +80,8 @@ async function establishBackendSession(){
    mints a fresh session once, then replays the request. Guarded so a genuine
    auth failure cannot become an infinite retry loop. */
 let _sessionRepairInFlight = null;
+// Guards the one-off re-authentication prompt so it can never loop.
+let _reauthPrompted = false;
 async function repairSessionAndRetry(doRequest){
   let res = await doRequest();
   if(res.status !== 401) return res;
