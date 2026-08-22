@@ -9,6 +9,7 @@ function renderAll(){
   renderContacts();
   renderBoard();
   renderTasks();
+  renderAutomations();
   renderScheduling();
   renderReports();
   renderSocial();

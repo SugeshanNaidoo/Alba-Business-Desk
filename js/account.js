@@ -137,12 +137,20 @@ async function refreshSubscriptionStatus(){
     // Billing is owner-only, enforced server-side. Hide the controls from
     // everyone else rather than letting them click into a 403 — and hide the
     // "subscribe" prompt too, since a member genuinely cannot act on it.
-    const isOwner = (typeof roleAtLeast === 'function') ? roleAtLeast('owner') : true;
+    // roleAllows() returns true while the role is still unknown, so the
+    // controls are never hidden from an owner just because bootstrap hasn't
+    // returned yet. applyRoleGates() re-runs this once it has.
+    const isOwner = (typeof roleAllows === 'function') ? roleAllows('owner') : true;
+    const ownerNoteEl = document.getElementById('billingOwnerOnlyNote');
+    if(ownerNoteEl) ownerNoteEl.style.display = 'none';
     if(!isOwner){
       subscribeBtn.style.display = 'none';
       cancelBtn.style.display = 'none';
       const del = document.getElementById('billingDeleteAccountBtn');
       if(del) del.style.display = 'none';
+      // Explain the absence rather than silently omitting the controls.
+      const ownerNote = document.getElementById('billingOwnerOnlyNote');
+      if(ownerNote) ownerNote.style.display = 'block';
       const banner = document.getElementById('subscribeBanner');
       if(banner && !isActive){
         banner.querySelector('span').textContent =
@@ -342,6 +350,9 @@ async function handleAuthChange(user){
     // whole window. Resolve it as soon as the session exists.
     await refreshBilling();
     await initOrgContext();
+    // The role is only known now — re-apply every role-dependent UI gate.
+    // Anything evaluated before this point defaulted to permissive.
+    applyRoleGates();
     document.getElementById('authLoadingOverlay').classList.remove('active');
     if(ORG_CONTEXT){
       await loadWorkspace();
@@ -413,3 +424,13 @@ if(FIREBASE_CONFIG){
   connectFirebase(FIREBASE_CONFIG);
 }
 
+
+
+/* Re-applies role-dependent UI after the organisation context resolves.
+   Everything here is cosmetic — the server and Firestore rules enforce the
+   real boundaries — but showing an owner a read-only workspace is a bug
+   worth preventing precisely. */
+function applyRoleGates(){
+  if(typeof refreshSubscriptionStatus === 'function') refreshSubscriptionStatus();
+  if(typeof applySettingsRoleGate === 'function') applySettingsRoleGate();
+}

@@ -348,12 +348,13 @@ document.addEventListener('click', ()=>{
 
 
 /* ---------- Nav / views ---------- */
-const views = {dashboard:'Dashboard',contacts:'Contacts',deals:'Pipeline',tasks:'Tasks',scheduling:'Calendar',reports:'Reports',social:'Social',billing:'Billing',settings:'Settings'};
+const views = {dashboard:'Dashboard',contacts:'Contacts',deals:'Pipeline',tasks:'Tasks',automations:'Automations',scheduling:'Calendar',reports:'Reports',social:'Social',billing:'Billing',settings:'Settings'};
 const subs = {
   dashboard:'Your pipeline at a glance',
   contacts:"Everyone you're building a relationship with",
   deals:'Track every deal from lead to close',
   tasks:'What needs your attention',
+  automations:'Rules that do the routine work for you',
   scheduling:'Your connected Google Calendar',
   reports:'How the business is trending',
   social:'Followers, engagement, and mentions across your platforms',

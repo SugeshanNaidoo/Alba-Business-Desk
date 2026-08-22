@@ -47,10 +47,26 @@ function currentRole(){ return ORG_CONTEXT ? ORG_CONTEXT.role : null; }
 /* Role gate for UI affordances. NEVER the only check — every sensitive action
    is also enforced server-side and in the Firestore rules. */
 const ROLE_RANK = { viewer: 0, member: 1, admin: 2, owner: 3 };
+/* True once the organisation context has resolved and a role is known.
+
+   UI gates MUST check this before restricting anything. Treating "not loaded
+   yet" as "not permitted" is what made an owner see a read-only workspace:
+   the billing panel asked for the role before bootstrap had returned it, got
+   false, and hid the controls permanently. A restrictive default is only
+   safe if it is read AFTER it resolves. */
+function roleKnown(){ return !!(ORG_CONTEXT && ORG_CONTEXT.role); }
+
 function roleAtLeast(minimum){
   const r = currentRole();
   if(!r) return false;
   return (ROLE_RANK[r] ?? -1) >= (ROLE_RANK[minimum] ?? 99);
+}
+
+/* Convenience for UI gates: "am I allowed, or do we not know yet?"
+   Returns true while unknown, so nothing is disabled prematurely — the
+   server and Firestore rules remain the actual enforcement. */
+function roleAllows(minimum){
+  return !roleKnown() || roleAtLeast(minimum);
 }
 
 /* ---- Team management -----------------------------------------------------

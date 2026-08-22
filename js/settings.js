@@ -14,13 +14,24 @@ document.querySelectorAll('#settingsSubNav .settings-subnav-item').forEach(item=
    controls that write to it are disabled — enforced in the rules regardless,
    this just avoids offering an action that will be refused. */
 function applySettingsRoleGate(){
-  const canEdit = (typeof roleAtLeast !== 'function') || roleAtLeast('admin');
-  if(canEdit) return;
-  ['addTeamMemberBtn','addAutomationBtn','addStageBtn','addStatusBtn','addSourceBtn',
-   'addLostReasonBtn','addTargetBtn','resetDataBtn','settingsWorkspaceName']
-    .forEach(id => { const el = document.getElementById(id); if(el) el.disabled = true; });
+  // roleAllows() is permissive while the role is unknown — disabling first
+  // and asking later is what showed an owner a read-only workspace.
+  const canEdit = (typeof roleAllows !== 'function') || roleAllows('admin');
   const note = document.getElementById('settingsRoleNote');
-  if(note) note.style.display = 'block';
+  const ids = ['addTeamMemberBtn','addAutomationBtn','addStageBtn','addStatusBtn','addSourceBtn',
+               'addLostReasonBtn','addTargetBtn','resetDataBtn','settingsWorkspaceName'];
+  if(canEdit){
+    // Re-enable: this runs again once the role resolves, so a premature
+    // disable must be reversible rather than sticky.
+    ids.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = false; });
+    if(note) note.style.display = 'none';
+    return;
+  }
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = true; });
+  if(note){
+    note.textContent = `You're signed in as a ${currentRole() || 'member'}. Only an owner or admin can change workspace settings.`;
+    note.style.display = 'block';
+  }
 }
 
 function renderSettings(){
@@ -34,7 +45,6 @@ function renderSettings(){
   renderMembers();
   renderLostReasonEditor();
   renderTargetEditor();
-  renderAutomations();
   applySettingsRoleGate();
 
   document.getElementById('stageEditorList').innerHTML = DATA.stages.map((s,i)=>`
@@ -722,85 +732,6 @@ document.getElementById('sendInviteBtn').addEventListener('click', async ()=>{
 });
 
 
-/* ---- Automations ---------------------------------------------------------
-   Rules live in DATA.automations, which is a config key — so they persist in
-   the workspace config document alongside stages and custom fields. */
-let editingAutomationId = null;
-
-function renderAutomations(){
-  const el = document.getElementById('automationsList');
-  if(!el) return;
-  const rules = DATA.automations || [];
-  el.innerHTML = rules.length ? rules.map(a => `
-    <div class="info-row">
-      <span style="min-width:0;">
-        <strong style="font-size:13.5px;">${escapeHtml(describeAutomation(a))}</strong>
-        ${a.enabled === false ? '<span class="tag tag-other" style="margin-left:6px;">Paused</span>' : ''}
-      </span>
-      <span style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-ghost btn-sm" data-toggle-auto="${a.id}">${a.enabled === false ? 'Enable' : 'Pause'}</button>
-        <button class="btn btn-ghost btn-sm" data-edit-auto="${a.id}">Edit</button>
-      </span>
-    </div>`).join('')
-    : '<p class="topbar-sub">No rules yet. A good first one: when a contact is created, create a follow-up task in 3 days.</p>';
-
-  el.querySelectorAll('[data-edit-auto]').forEach(b=>
-    b.addEventListener('click', ()=>openAutomationModal(b.dataset.editAuto)));
-  el.querySelectorAll('[data-toggle-auto]').forEach(b=>
-    b.addEventListener('click', ()=>{
-      if(!requireSubscriptionForAction()) return;
-      const a = DATA.automations.find(x=>x.id===b.dataset.toggleAuto);
-      if(a){ a.enabled = a.enabled === false; saveData(DATA); renderAutomations(); }
-    }));
-}
-
-function openAutomationModal(id){
-  editingAutomationId = id || null;
-  const a = id ? (DATA.automations || []).find(x=>x.id===id) : null;
-  document.getElementById('automationModalTitle').textContent = a ? 'Edit rule' : 'New rule';
-
-  const trig = document.getElementById('autoTrigger');
-  trig.innerHTML = Object.entries(AUTOMATION_TRIGGERS)
-    .map(([k,v])=>`<option value="${k}">${escapeHtml(v)}</option>`).join('');
-  const act = document.getElementById('autoAction');
-  act.innerHTML = Object.entries(AUTOMATION_ACTIONS)
-    .map(([k,v])=>`<option value="${k}">${escapeHtml(v)}</option>`).join('');
-  document.getElementById('autoStage').innerHTML =
-    DATA.stages.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-  document.getElementById('autoTaskAssign').innerHTML =
-    '<option value="">Nobody in particular</option>' +
-    DATA.teamMembers.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
-
-  trig.value = (a && a.when && a.when.event) || 'contact.created';
-  act.value  = (a && a.then && a.then.action) || 'task.create';
-  if(a && a.when && a.when.stage) document.getElementById('autoStage').value = a.when.stage;
-  const p = (a && a.then && a.then.params) || {};
-  document.getElementById('autoTaskTitle').value = p.title || '';
-  document.getElementById('autoTaskDays').value = p.dueInDays !== undefined ? p.dueInDays : 3;
-  document.getElementById('autoTaskPriority').value = p.priority || 'medium';
-  document.getElementById('autoTaskAssign').value = p.assignTo || '';
-  document.getElementById('autoNoteText').value = p.note || '';
-
-  document.getElementById('deleteAutomationBtn').style.display = a ? 'inline-flex' : 'none';
-  syncAutomationFields();
-  document.getElementById('automationModalOverlay').classList.add('active');
-}
-
-/* The stage picker only applies to one trigger, and the parameter fields
-   depend on the action — showing all of them at once invites nonsense rules. */
-function syncAutomationFields(){
-  document.getElementById('autoStageWrap').style.display =
-    document.getElementById('autoTrigger').value === 'deal.stage_changed' ? 'block' : 'none';
-  const isTask = document.getElementById('autoAction').value === 'task.create';
-  document.getElementById('autoTaskParams').style.display = isTask ? 'block' : 'none';
-  document.getElementById('autoNoteParams').style.display = isTask ? 'none' : 'block';
-}
-document.getElementById('autoTrigger').addEventListener('change', syncAutomationFields);
-document.getElementById('autoAction').addEventListener('change', syncAutomationFields);
-document.getElementById('addAutomationBtn').addEventListener('click', ()=>{
-  if(!requireSubscriptionForAction()) return;
-  openAutomationModal(null);
-});
 
 document.getElementById('saveAutomationBtn').addEventListener('click', async ()=>{
   if(!requireSubscriptionForAction()) return;
@@ -828,7 +759,6 @@ document.getElementById('saveAutomationBtn').addEventListener('click', async ()=
   }
   saveData(DATA);
   closeModals();
-  renderAutomations();
 });
 
 document.getElementById('deleteAutomationBtn').addEventListener('click', async ()=>{
@@ -838,5 +768,4 @@ document.getElementById('deleteAutomationBtn').addEventListener('click', async (
   DATA.automations = (DATA.automations || []).filter(a=>a.id!==editingAutomationId);
   saveData(DATA);
   closeModals();
-  renderAutomations();
 });
