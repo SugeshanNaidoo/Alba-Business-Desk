@@ -116,19 +116,6 @@ function performAutomationAction(rule, ctx){
   return false;
 }
 
-/* Human-readable summary, used in the settings list. */
-function describeAutomation(a){
-  const trigger = AUTOMATION_TRIGGERS[a.when && a.when.event] || 'Something happens';
-  const stage = (a.when && a.when.stage) ? ` “${a.when.stage}”` : '';
-  const action = AUTOMATION_ACTIONS[a.then && a.then.action] || 'do something';
-  const p = (a.then && a.then.params) || {};
-  let detail = '';
-  if(a.then && a.then.action === 'task.create'){
-    const d = Number(p.dueInDays);
-    detail = ` — “${p.title || 'Follow up'}”${isFinite(d) && d > 0 ? `, due in ${d} day${d===1?'':'s'}` : ', due today'}`;
-  }
-  return `When ${trigger.toLowerCase()}${stage}, ${action.toLowerCase()}${detail}`;
-}
 
 
 /* ---- UI (Automations tab) ------------------------------------------------
@@ -139,22 +126,93 @@ function describeAutomation(a){
    the workspace config document alongside stages and custom fields. */
 let editingAutomationId = null;
 
+/* Starter rules offered when the list is empty, or as one-click additions.
+   Concrete examples do far more than an empty state to explain what this
+   module is for. */
+const AUTOMATION_TEMPLATES = [
+  { title:'Follow up on every new contact',
+    sub:'When a contact is created → task in 3 days',
+    rule:{ when:{event:'contact.created'},
+           then:{action:'task.create', params:{title:'Follow up with {{name}}', dueInDays:3, priority:'medium'}} } },
+  { title:'Chase proposals',
+    sub:'When a deal moves to Proposal → task in 2 days',
+    rule:{ when:{event:'deal.stage_changed', stage:'Proposal'},
+           then:{action:'task.create', params:{title:'Check in on {{name}}', dueInDays:2, priority:'high'}} } },
+  { title:'Onboard new customers',
+    sub:'When a deal is won → task tomorrow',
+    rule:{ when:{event:'deal.won'},
+           then:{action:'task.create', params:{title:'Kick off {{name}}', dueInDays:1, priority:'high'}} } },
+  { title:'Keep a paper trail',
+    sub:'When a deal moves to Negotiation → log a note',
+    rule:{ when:{event:'deal.stage_changed', stage:'Negotiation'},
+           then:{action:'activity.log', params:{note:'{{name}} entered negotiation'}} } }
+];
+
+const AUTOMATION_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></svg>';
+
 function renderAutomations(){
   const el = document.getElementById('automationsList');
   if(!el) return;
   const rules = DATA.automations || [];
-  el.innerHTML = rules.length ? rules.map(a => `
-    <div class="info-row">
-      <span style="min-width:0;">
-        <strong style="font-size:13.5px;">${escapeHtml(describeAutomation(a))}</strong>
-        ${a.enabled === false ? '<span class="tag tag-other" style="margin-left:6px;">Paused</span>' : ''}
-      </span>
-      <span style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-ghost btn-sm" data-toggle-auto="${a.id}">${a.enabled === false ? 'Enable' : 'Pause'}</button>
+  const active = rules.filter(a => a.enabled !== false).length;
+
+  // Summary + stat cards, matching the shape of every other module.
+  const summary = document.getElementById('automationSummary');
+  if(summary){
+    summary.textContent = rules.length
+      ? `${rules.length} rule${rules.length===1?'':'s'} · ${active} active`
+      : 'No rules yet';
+  }
+  const grid = document.getElementById('automationStatGrid');
+  if(grid){
+    const created = (DATA.tasks || []).filter(t => t.createdByAutomation).length;
+    grid.innerHTML = `
+      <div class="stat-card"><div class="stat-label">Rules</div><div class="stat-value">${rules.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value">${active}</div><div class="stat-delta">${rules.length-active} paused</div></div>
+      <div class="stat-card"><div class="stat-label">Tasks created</div><div class="stat-value">${created}</div><div class="stat-delta">by your rules</div></div>`;
+  }
+
+  el.innerHTML = rules.length ? rules.map(a => {
+    const paused = a.enabled === false;
+    const trigger = AUTOMATION_TRIGGERS[a.when && a.when.event] || 'Something happens';
+    const stage = (a.when && a.when.stage) ? ` “${escapeHtml(a.when.stage)}”` : '';
+    const p = (a.then && a.then.params) || {};
+    const then = a.then && a.then.action === 'task.create'
+      ? `Create task “${escapeHtml(p.title || 'Follow up')}”${Number(p.dueInDays) > 0 ? `, due in ${Number(p.dueInDays)} day${Number(p.dueInDays)===1?'':'s'}` : ', due today'}`
+      : `Log a note: “${escapeHtml(p.note || '')}”`;
+    return `<div class="automation-row ${paused?'paused':''}">
+      <div class="automation-icon">${AUTOMATION_ICON}</div>
+      <div class="automation-body">
+        <div class="automation-when">When ${escapeHtml(trigger.toLowerCase())}${stage}</div>
+        <div class="automation-then">→ ${then}</div>
+      </div>
+      <div class="automation-actions">
+        <button class="btn btn-ghost btn-sm" data-toggle-auto="${a.id}">${paused?'Enable':'Pause'}</button>
         <button class="btn btn-ghost btn-sm" data-edit-auto="${a.id}">Edit</button>
-      </span>
-    </div>`).join('')
-    : '<p class="topbar-sub">No rules yet. A good first one: when a contact is created, create a follow-up task in 3 days.</p>';
+      </div>
+    </div>`;
+  }).join('')
+  : `<div class="empty-state"><h3>No rules yet</h3><p>Pick a starter below, or create your own.</p></div>`;
+
+  const ex = document.getElementById('automationExamples');
+  if(ex){
+    ex.innerHTML = AUTOMATION_TEMPLATES.map((t,i)=>`
+      <div class="automation-example" data-template="${i}">
+        <div class="automation-example-title">${escapeHtml(t.title)}</div>
+        <div class="automation-example-sub">${escapeHtml(t.sub)}</div>
+      </div>`).join('');
+    ex.querySelectorAll('[data-template]').forEach(card=>{
+      card.addEventListener('click', async ()=>{
+        if(!requireSubscriptionForAction()) return;
+        const t = AUTOMATION_TEMPLATES[Number(card.dataset.template)];
+        DATA.automations = DATA.automations || [];
+        DATA.automations.push({ id: uid('auto'), enabled: true, when: {...t.rule.when}, then: JSON.parse(JSON.stringify(t.rule.then)) });
+        saveData(DATA);
+        renderAutomations();
+        await showAlert(`Added: ${t.title}. You can edit or pause it any time.`, { title:'Rule added' });
+      });
+    });
+  }
 
   el.querySelectorAll('[data-edit-auto]').forEach(b=>
     b.addEventListener('click', ()=>openAutomationModal(b.dataset.editAuto)));

@@ -55,7 +55,7 @@ async function refreshGcalStatus(){
    connected, matching how the social platform buttons behave. */
 document.getElementById('connectGoogleCalendarBtn').addEventListener('click', async ()=>{
   if(!requireSubscriptionForAction()) return;
-  if(typeof roleAtLeast === 'function' && !roleAtLeast('admin')){
+  if(typeof roleAllows === 'function' && !roleAllows('admin')){
     await showAlert('Only an owner or admin can connect or disconnect the calendar for this workspace.',
       { title:'Not permitted' });
     return;

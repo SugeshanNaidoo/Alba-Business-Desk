@@ -56,6 +56,10 @@ async function handleDisconnect(req, res){
   if(!roleAtLeast(ctx.role, 'admin')){
     return res.status(403).json({ error: 'Only an owner or admin can disconnect integrations.' });
   }
+  const dcIp = clientIp(req);
+  if(!(await checkRateLimit(`social-disconnect:${dcIp}`, { limit: 20, windowSeconds: 60 }))){
+    return res.status(429).json({ error: 'Too many requests — please wait a minute.' });
+  }
   const platform = req.query.platform;
   if(!['meta','instagram','tiktok'].includes(platform)){
     return res.status(400).json({ error: 'Unknown platform.' });
@@ -119,8 +123,16 @@ async function handleStatus(req, res){
 // own connected platforms into their own CRM data — not a single shared
 // workspace anymore.
 async function handleScheduled(req, res){
+  // FAIL CLOSED. The previous guard was `if(CRON_SECRET && ...)`, which
+  // skipped the check entirely when the variable was missing — leaving an
+  // endpoint that syncs every organisation publicly callable. A missing
+  // secret is a misconfiguration, not permission.
   const authHeader = req.headers['authorization'];
-  if(process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`){
+  if(!process.env.CRON_SECRET){
+    console.error('CRON_SECRET is not set — refusing to run the scheduled sync.');
+    return res.status(503).json({ error: 'Scheduled sync is not configured.' });
+  }
+  if(authHeader !== `Bearer ${process.env.CRON_SECRET}`){
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try{

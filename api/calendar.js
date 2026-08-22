@@ -145,6 +145,15 @@ async function handleDisconnect(req, res){
   let ctx;
   try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  // The calendar belongs to the workspace, so disconnecting it affects every
+  // member — same bar as connecting it, and as social disconnect.
+  if(!roleAtLeast(ctx.role, 'admin')){
+    return res.status(403).json({ error: 'Only an owner or admin can disconnect the calendar for this workspace.' });
+  }
+  const dIp = clientIp(req);
+  if(!(await checkRateLimit(`gcal-disconnect:${dIp}`, { limit: 20, windowSeconds: 60 }))){
+    return res.status(429).json({ error: 'Too many requests — please wait a minute.' });
+  }
 
   try{
     const conn = await getConnection(ctx.orgId, 'google_calendar');
@@ -241,6 +250,11 @@ async function handleUpdateEvent(req, res){
     return res.status(402).json({ error: 'An active subscription is needed to edit calendar events.' });
   }
 
+  const rlIp = clientIp(req);
+  if(!(await checkRateLimit(`gcal-update:${rlIp}`, { limit: 30, windowSeconds: 60 }))){
+    return res.status(429).json({ error: 'Too many requests — please wait a minute.' });
+  }
+
   const { eventId, summary, description, startTime, endTime, attendeeEmails, needsMeet } = req.body || {};
   if(!eventId) return res.status(400).json({ error: 'Missing eventId.' });
 
@@ -274,6 +288,11 @@ async function handleDeleteEvent(req, res){
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).json({ error: 'An active subscription is needed to delete calendar events.' });
+  }
+
+  const rlIp = clientIp(req);
+  if(!(await checkRateLimit(`gcal-delete:${rlIp}`, { limit: 30, windowSeconds: 60 }))){
+    return res.status(429).json({ error: 'Too many requests — please wait a minute.' });
   }
 
   const { eventId } = req.body || {};

@@ -348,7 +348,7 @@ SOCIAL_BUTTONS.forEach(cfg=>{
     // Integrations belong to the workspace, so connecting or disconnecting
     // one is an admin action. Enforced server-side too — this is only to
     // avoid sending a request that will be refused.
-    if(typeof roleAtLeast === 'function' && !roleAtLeast('admin')){
+    if(typeof roleAllows === 'function' && !roleAllows('admin')){
       await showAlert('Only an owner or admin can connect or disconnect integrations for this workspace.',
         { title:'Not permitted' });
       return;

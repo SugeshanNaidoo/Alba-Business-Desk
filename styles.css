@@ -576,6 +576,34 @@ tbody tr:hover{background:var(--hover-surface);}
 .onboarding-step.done .onboarding-label{color:var(--graphite);text-decoration:line-through;}
 .onboarding-step .btn{flex-shrink:0;}
 
+/* Automations */
+.automation-row{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:13px 0;border-bottom:1px solid var(--line);min-width:0;
+}
+.automation-row:last-child{border-bottom:none;}
+.automation-icon{
+  width:32px;height:32px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--flow-soft);color:var(--flow);
+}
+.automation-icon svg{width:16px;height:16px;}
+.automation-row.paused .automation-icon{background:var(--control-track);color:var(--graphite-soft);}
+.automation-body{flex:1;min-width:0;}
+.automation-when{font-size:13.5px;font-weight:580;overflow-wrap:break-word;}
+.automation-then{font-size:12.5px;color:var(--graphite);margin-top:3px;overflow-wrap:break-word;}
+.automation-row.paused .automation-when{color:var(--graphite);}
+.automation-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.automation-examples{display:grid;grid-template-columns:1fr;gap:10px;}
+.automation-example{
+  border:1px dashed var(--line-strong);border-radius:var(--radius);
+  padding:12px 14px;cursor:pointer;transition:border-color .15s ease, background-color .15s ease;
+}
+.automation-example:hover{border-color:var(--flow);background:var(--flow-soft);}
+.automation-example-title{font-size:13.5px;font-weight:580;margin-bottom:3px;}
+.automation-example-sub{font-size:12px;color:var(--graphite);}
+@media (min-width:700px){ .automation-examples{grid-template-columns:1fr 1fr;} }
+
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;}
 /* Below 600px these sit in 2 columns, so the third card would be orphaned
    with a gap beside it — let it span the full row instead. */
@@ -808,17 +836,28 @@ tbody tr:hover{background:var(--hover-surface);}
 .info-row > span:last-child{text-align:right;min-width:0;overflow-wrap:break-word;}
 .stage-editor-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;min-width:0;}
 .stage-editor-row input{flex:1;min-width:0;}
-.theme-toggle-row{display:flex;gap:8px;align-items:stretch;}
-.theme-toggle-btn{
-  display:flex;align-items:center;justify-content:center;gap:7px;
-  flex:1;min-width:0;
-  padding:11px 14px;border-radius:var(--radius-sm);
-  background:var(--card);border:1px solid var(--line-strong);
-  color:var(--ink);font-size:14px;font-weight:550;
-  cursor:pointer;font-family:inherit;
+/* A compact segmented control rather than two full-size buttons — this sits
+   in the sidebar, where vertical space is the scarce resource. Slimming it
+   is usually enough to keep the sidebar from needing to scroll at all. */
+.theme-toggle-row{
+  display:flex;gap:2px;align-items:stretch;
+  padding:2px;background:var(--control-track);
+  border-radius:100px;margin-top:8px;
 }
-.theme-toggle-btn:hover{background:var(--hover-surface);}
-.theme-toggle-btn svg{width:18px;height:18px;flex-shrink:0;}
+.theme-toggle-btn{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  flex:1;min-width:0;
+  padding:6px 8px;border-radius:100px;
+  background:transparent;border:none;
+  color:var(--graphite);font-size:12px;font-weight:540;
+  cursor:pointer;font-family:inherit;
+  transition:background-color .15s ease, color .15s ease;
+}
+.theme-toggle-btn:hover{color:var(--ink);}
+/* The active side reads as selected, so the control shows current state
+   rather than just offering two equal options. */
+.theme-toggle-btn.active{background:var(--card);color:var(--ink);box-shadow:var(--shadow-xs);}
+.theme-toggle-btn svg{width:14px;height:14px;flex-shrink:0;}
 
 /* ---------------------------------------------------- modals & overlays -- */
 /* Mobile: bottom sheet. Desktop: centred dialog. */

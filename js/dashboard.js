@@ -150,9 +150,14 @@ async function fetchOnboardingStatus(){
   if(_onboardingStatusFetched || !ORG_CONTEXT) return;
   _onboardingStatusFetched = true;
   try{
+    // Routed through repairSessionAndRetry: this is the first authenticated
+    // call after sign-in, so it is where a stale or revoked session cookie
+    // shows up first.
+    const get = (url) => repairSessionAndRetry(() =>
+      fetch(url, { credentials:'include' })).then(r => r.ok ? r.json() : null).catch(()=>null);
     const [social, cal, team] = await Promise.all([
-      fetch(`${BACKEND_BASE}/api/social-sync?action=status`, { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch(`${BACKEND_BASE}/api/calendar?action=status`,     { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
+      get(`${BACKEND_BASE}/api/social-sync?action=status`),
+      get(`${BACKEND_BASE}/api/calendar?action=status`),
       typeof listMembers === 'function' ? listMembers() : null
     ]);
     if(social) INTEGRATION_STATE.social = ['meta','instagram','tiktok'].some(k => social[k] && social[k].connected);

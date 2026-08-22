@@ -35,16 +35,44 @@ function getCsrfToken(){
 }
 async function establishBackendSession(){
   const base = BACKEND_BASE;
-  if(!cloudUser) return;
+  if(!cloudUser) return false;
   try{
-    const idToken = await cloudUser.getIdToken();
-    await fetch(`${base}/api/session?action=login`, {
+    // FORCE a fresh token. getIdToken() returns a cached one, and signing
+    // out calls revokeRefreshTokens() — so after a sign-out/sign-in cycle a
+    // cached token predates the revocation. The session cookie minted from
+    // it is then correctly rejected by verifySessionCookie(cookie, true)
+    // with auth/session-cookie-revoked, and every API call 401s.
+    const idToken = await cloudUser.getIdToken(true);
+    const res = await fetch(`${base}/api/session?action=login`, {
       method: 'POST', credentials: 'include',
       headers: { Authorization: `Bearer ${idToken}` }
     });
+    if(!res.ok){
+      console.error('Backend session could not be established:', res.status);
+      return false;
+    }
+    return true;
   }catch(err){
     console.error('Could not establish a backend session — billing features may be unavailable.', err);
+    return false;
   }
+}
+
+/* Recovers from a stale or revoked session cookie.
+
+   Any authenticated call that gets a 401 can hand its retry to this: it
+   mints a fresh session once, then replays the request. Guarded so a genuine
+   auth failure cannot become an infinite retry loop. */
+let _sessionRepairInFlight = null;
+async function repairSessionAndRetry(doRequest){
+  let res = await doRequest();
+  if(res.status !== 401) return res;
+  if(!_sessionRepairInFlight){
+    _sessionRepairInFlight = establishBackendSession().finally(()=>{ _sessionRepairInFlight = null; });
+  }
+  const repaired = await _sessionRepairInFlight;
+  if(!repaired) return res;
+  return doRequest();
 }
 
 function showSignedIn(user){

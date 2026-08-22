@@ -275,3 +275,75 @@ role too. Silent absence reads as a bug; a stated reason reads as a rule.
 * **Automations** promoted from a settings panel to a **top-level tab**, and
   its UI moved from `settings.js` into `automations.js` — the tab and the
   engine that powers it now live in the same module.
+
+
+---
+
+# Senior-level audit — findings
+
+Handler-by-handler review of every route against every control.
+
+## FINDING 1 (high) — the cron endpoint failed OPEN
+
+```js
+if(process.env.CRON_SECRET && authHeader !== `Bearer ${...}`) return 401;
+```
+
+When `CRON_SECRET` was **unset**, the condition short-circuited and the check
+was skipped entirely — leaving an endpoint that syncs **every organisation**
+publicly callable. Vercel normally provisions the variable, so this would not
+show in testing; it becomes exploitable exactly when configuration is wrong,
+which is when you least want a fail-open.
+
+Now fails closed: a missing secret returns 503 and logs. **A missing secret is
+a misconfiguration, not permission.**
+
+## FINDING 2 (medium) — calendar disconnect had no role check
+
+Connecting the calendar required admin. Social disconnect required admin.
+**Calendar disconnect required nothing** — any member could disconnect the
+whole workspace's calendar. Now admin+, matching its siblings.
+
+## FINDING 3 (low) — four endpoints unrate-limited
+
+`calendar:disconnect`, `calendar:update-event`, `calendar:delete-event`,
+`social-sync:disconnect`. Create-event had a limit; update and delete did not.
+All four now limited.
+
+## FINDING 4 (low) — UI role gates used the strict check
+
+`scheduling.js` and `settings.js` gated on `roleAtLeast('admin')`, which
+returns false while the role is still resolving — so an admin acting quickly
+after sign-in would be told "Not permitted". This is the same bug class fixed
+earlier for billing. Both now use `roleAllows()`, permissive-while-unknown,
+with the server as the real enforcement.
+
+## Verified correct
+
+* **PayFast ITN** has no session auth **by design** — verified by signature,
+  source IP and postback. Correct.
+* **session:login** has no session auth — it creates one. Correct.
+* Read-only endpoints (`status`, `history`, `members`, `context`,
+  `list-events`) are unlimited by choice: cheap and non-mutating.
+* Every rule path enumerated and checked. No collection is reachable except
+  through an explicit rule; catch-all denies the rest.
+* `organisations/{orgId}` update blocks `subscription`, `ownerId`,
+  `migration`, `migrationMeta`, `dataModelVersion`.
+* No handler references an undefined variable (scripted scan).
+* No duplicate element IDs; every `getElementById` target exists.
+
+## Control matrix — final
+
+| Route | auth | rate | csrf | role | sub |
+|---|---|---|---|---|---|
+| billing: checkout / cancel / delete | ✅ | ✅ | ✅¹ | owner | — |
+| billing: notify (ITN) | sig+IP | ✅ | n/a | n/a | n/a |
+| calendar: connect / disconnect | ✅ | ✅ | ✅² | admin | ✅ |
+| calendar: create / update / delete | ✅ | ✅ | ✅ | — | ✅ |
+| oauth: meta / instagram / tiktok | ✅ | ✅ | state | admin | ✅ |
+| organisation: all mutating actions | ✅ | ✅ | ✅ | ✅ | — |
+| social-sync: sync / disconnect | ✅ | ✅ | ✅² | admin² | ✅ |
+| social-sync: scheduled | CRON_SECRET (fail-closed) | — | n/a | n/a | n/a |
+
+¹ checkout is a GET redirect; CSRF n/a, owner role enforced.
+² disconnect only; connect is a browser redirect protected by the OAuth state cookie.
