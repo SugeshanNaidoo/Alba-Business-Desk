@@ -11,6 +11,7 @@
 
 const { setCors, normalizeBaseUrl } = require('../lib/util');
 const { verifySession } = require('../lib/session');
+const { resolveOrgContext, roleAtLeast } = require('../lib/orgContext');
 const { getAdmin, getDb } = require('../lib/firebaseAdmin');
 const { buildSubscriptionFields, PAYFAST_PROCESS_URL, validateItn, isRequestFromPayfast, cancelSubscription } = require('../lib/payfast');
 const { checkRateLimit } = require('../lib/rateLimit');
@@ -27,6 +28,18 @@ async function handleCheckout(req, res){
   let decoded;
   try{ decoded = await verifySession(req); }
   catch(err){ return res.status(err.status||401).send('You need to be signed in to subscribe. Go back to the CRM, sign in with Google, and try again.'); }
+  // Only the owner may start a subscription. PayFast binds the resulting
+  // subscription to whoever checks out (m_payment_id = their uid), so a
+  // member subscribing would create billing attached to the wrong person
+  // and detached from the organisation's owner.
+  try{
+    const ctx = await resolveOrgContext(req);
+    if(!roleAtLeast(ctx.role, 'owner')){
+      return res.status(403).send('Only the organisation owner can start or change a subscription.');
+    }
+  }catch(err){
+    return res.status(err.status || 401).send('Could not verify your workspace. Please reload and try again.');
+  }
   await logEvent('checkout_started', { uid: decoded.uid, ip });
 
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
@@ -104,6 +117,19 @@ async function handleCancel(req, res){
   let decoded;
   try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  // Billing belongs to the organisation OWNER. Without this, any signed-in
+  // member of a workspace could cancel its subscription or delete the whole
+  // account — the session proved who they were, but never what they were
+  // allowed to do.
+  try{
+    const ctx = await resolveOrgContext(req);
+    if(!roleAtLeast(ctx.role, 'owner')){
+      return res.status(403).json({ error: 'Only the organisation owner can manage billing.' });
+    }
+  }catch(err){
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
 
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
   const passphrase = process.env.PAYFAST_PASSPHRASE || '';
@@ -157,6 +183,19 @@ async function handleDeleteAccount(req, res){
   let decoded;
   try{ decoded = await verifySession(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
+  // Billing belongs to the organisation OWNER. Without this, any signed-in
+  // member of a workspace could cancel its subscription or delete the whole
+  // account — the session proved who they were, but never what they were
+  // allowed to do.
+  try{
+    const ctx = await resolveOrgContext(req);
+    if(!roleAtLeast(ctx.role, 'owner')){
+      return res.status(403).json({ error: 'Only the organisation owner can manage billing.' });
+    }
+  }catch(err){
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
   const uid = decoded.uid;
 
   const merchantId = process.env.PAYFAST_MERCHANT_ID;
@@ -188,9 +227,10 @@ async function handleDeleteAccount(req, res){
     // Delete the user's organisation and everything under it. Subcollections
     // are not removed by deleting the parent document in Firestore, so each
     // is cleared explicitly.
+    let orgId = null;
     try{
       const userSnap = await db.collection('users').doc(uid).get();
-      const orgId = userSnap.exists ? userSnap.data().activeOrganisationId : null;
+      orgId = userSnap.exists ? userSnap.data().activeOrganisationId : null;
       if(orgId){
         const orgRef = db.collection('organisations').doc(orgId);
         for(const sub of ['contacts','companies','deals','tasks','activities',
@@ -205,10 +245,12 @@ async function handleDeleteAccount(req, res){
     }catch(e){
       console.error('Organisation cleanup during account deletion failed:', e.message);
     }
-    // Connections are per-customer now — clean up this account's own, not
-    // a shared workspace-wide set that belongs to anyone else.
-    for(const platform of ['meta', 'instagram', 'tiktok', 'google_calendar']){
-      await db.collection('social_connections').doc(`${uid}_${platform}`).delete().catch(()=>{});
+    // Integration tokens belong to the organisation, so they are removed
+    // with it rather than with the individual user.
+    if(orgId){
+      for(const platform of ['meta', 'instagram', 'tiktok', 'google_calendar']){
+        await db.collection('social_connections').doc(`${orgId}_${platform}`).delete().catch(()=>{});
+      }
     }
     await getAdmin().auth().deleteUser(uid).catch(e => console.error('Could not delete the Firebase Auth user record:', e.message));
 

@@ -52,3 +52,28 @@ function roleAtLeast(minimum){
   if(!r) return false;
   return (ROLE_RANK[r] ?? -1) >= (ROLE_RANK[minimum] ?? 99);
 }
+
+/* ---- Team management -----------------------------------------------------
+   Every one of these is authorised server-side; the role checks in the UI
+   only decide what to show. */
+async function _orgPost(action, body){
+  const res = await fetch(`${BACKEND_BASE}/api/organisation?action=${action}`, {
+    method:'POST', credentials:'include',
+    headers:{ 'Content-Type':'application/json', 'X-CSRF-Token': getCsrfToken() },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function listMembers(){
+  try{
+    const res = await fetch(`${BACKEND_BASE}/api/organisation?action=members`, { credentials:'include' });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(err){ console.error('Could not load the team list:', err); return null; }
+}
+const inviteMember   = (email, role) => _orgPost('invite', { email, role });
+const resendInvite   = (email)       => _orgPost('resend-invite', { email });
+const setMemberRole  = (uid, role)   => _orgPost('set-role', { uid, role });
+const removeMember   = (uid, email)  => _orgPost('remove-member', { uid, email });

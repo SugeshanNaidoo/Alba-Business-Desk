@@ -82,6 +82,12 @@ function recordStageChange(deal, newStage){
   deal.stage = newStage;
   deal.stageHistory = deal.stageHistory || [];
   deal.stageHistory.push({stage:newStage, enteredAt:Date.now()});
+  // Only fires on an actual change of stage — re-saving a deal without
+  // moving it must not re-trigger the rule.
+  if(typeof runAutomations === 'function'){
+    runAutomations('deal.stage_changed', { deal });
+    if(newStage === 'Won') runAutomations('deal.won', { deal });
+  }
   deal.lastActivityAt = Date.now();
   if(newStage !== 'Lost') deal.lostReason = null;
 }
@@ -182,6 +188,10 @@ document.getElementById('saveDealBtn').addEventListener('click', async ()=>{
     const deal = {id:uid('d'), createdAt:Date.now(), lastActivityAt:Date.now(), stage:newStage,
       stageHistory:[{stage:newStage, enteredAt:Date.now()}], ...payload};
     DATA.deals.push(deal);
+    if(typeof runAutomations === 'function'){
+      runAutomations('deal.created', { deal });
+      if(deal.stage === 'Won') runAutomations('deal.won', { deal });
+    }
     logActivity(`Added deal "${title}"`);
   }
   saveData(DATA); closeModals(); renderAll();

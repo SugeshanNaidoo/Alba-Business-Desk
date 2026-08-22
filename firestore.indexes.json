@@ -293,6 +293,36 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "Last-owner protection \u2014 counts active owners inside a transaction before a demotion or removal. Without this the guard throws and the operation is blocked.",
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "role",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "Invite lookup \u2014 finds an existing member by email when re-inviting someone previously removed.",
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "email",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

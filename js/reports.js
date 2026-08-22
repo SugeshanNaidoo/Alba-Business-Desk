@@ -98,7 +98,7 @@ function renderTargetsProgress(){
     const name = t.memberId==='team' ? 'Whole team' : ((DATA.teamMembers.find(m=>m.id===t.memberId)||{}).name || 'Unknown member');
     return `<div class="target-row">
       <div class="target-row-head">
-        <span class="target-row-name">${escapeHtml(name)} <span class="topbar-sub" style="font-size:11px;">(${t.period})</span></span>
+        <span class="target-row-name">${escapeHtml(name)} <span class="topbar-sub" style="font-size:11px;">(${escapeHtml(t.period||'')})</span></span>
         <span class="target-row-amounts">${fmtMoney(actual)} / ${fmtMoney(t.amount)}</span>
       </div>
       <div class="target-bar-track"><div class="target-bar-fill ${over?'over':''}" style="width:${pct}%;"></div></div>

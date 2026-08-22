@@ -16,6 +16,7 @@
 const { setCors, parseCookies, setCookie, normalizeBaseUrl } = require('../lib/util');
 const { setConnection, getConnection, deleteConnection } = require('../lib/tokenStore');
 const { verifySession } = require('../lib/session');
+const { resolveOrgContext, roleAtLeast } = require('../lib/orgContext');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
@@ -24,10 +25,14 @@ const crypto = require('crypto');
 
 /* ---------- Connect (start + callback combined, like the other OAuth flows) ---------- */
 async function handleConnectStart(req, res){
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){ return res.status(err.status||401).send('You need to be signed in to connect Google Calendar. Go back to the CRM, sign in with Google, and try again.'); }
-  if(!(await isUserSubscribed(decoded.uid))){
+  // Connecting an integration is an organisation-level change.
+  if(!roleAtLeast(ctx.role, 'admin')){
+    return res.status(403).send('Only an owner or admin can connect integrations for this workspace.');
+  }
+  if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).send('An active subscription is needed to connect Google Calendar. Go back to the CRM and subscribe from the Billing tab first.');
   }
 
@@ -74,8 +79,8 @@ async function handleConnectCallback(req, res){
     return res.end();
   }
 
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){
     res.writeHead(302, { Location: `${crmUrl}?social_connect=gcal_error` });
     return res.end();
@@ -104,13 +109,13 @@ async function handleConnectCallback(req, res){
       calendarEmail = prof.email || '';
     }catch(e){ /* cosmetic only */ }
 
-    await setConnection(decoded.uid, 'google_calendar', {
+    await setConnection(ctx.orgId, 'google_calendar', {
       refreshToken: tokenData.refresh_token,
       calendarId: 'primary',
       calendarEmail,
       connectedAt: Date.now()
     });
-    await logEvent('google_calendar_connected', { uid: decoded.uid, detail: calendarEmail });
+    await logEvent('google_calendar_connected', { uid: ctx.uid, orgId: ctx.orgId, detail: calendarEmail });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=gcal_success` });
     res.end();
@@ -123,11 +128,11 @@ async function handleConnectCallback(req, res){
 
 /* ---------- Status ---------- */
 async function handleStatus(req, res){
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   try{
-    const conn = await getConnection(decoded.uid, 'google_calendar');
+    const conn = await getConnection(ctx.orgId, 'google_calendar');
     return res.status(200).json(conn ? { connected: true, calendarEmail: conn.calendarEmail || '' } : { connected: false });
   }catch(err){
     return res.status(200).json({ connected: false, note: 'Could not reach Firestore.' });
@@ -137,12 +142,12 @@ async function handleStatus(req, res){
 /* ---------- Disconnect ---------- */
 async function handleDisconnect(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
 
   try{
-    const conn = await getConnection(decoded.uid, 'google_calendar');
+    const conn = await getConnection(ctx.orgId, 'google_calendar');
     // Best effort: tell Google to revoke the grant as well, so access ends
     // on their side too rather than us simply forgetting the token.
     if(conn && conn.refreshToken){
@@ -156,8 +161,8 @@ async function handleDisconnect(req, res){
         console.error('Google token revoke failed (continuing to delete locally):', e.message);
       }
     }
-    await deleteConnection(decoded.uid, 'google_calendar');
-    await logEvent('google_calendar_disconnected', { uid: decoded.uid });
+    await deleteConnection(ctx.orgId, 'google_calendar');
+    await logEvent('google_calendar_disconnected', { uid: ctx.uid, orgId: ctx.orgId });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error(err);
@@ -168,8 +173,8 @@ async function handleDisconnect(req, res){
 /* ---------- List events ---------- */
 async function handleListEvents(req, res){
   if(req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
 
   const timeMin = req.query.timeMin || new Date().toISOString();
@@ -177,7 +182,7 @@ async function handleListEvents(req, res){
   timeMaxDate.setDate(timeMaxDate.getDate() + (Number(req.query.days) || 30));
 
   try{
-    const events = await listEvents(decoded.uid, timeMin, timeMaxDate.toISOString(), 100);
+    const events = await listEvents(ctx.orgId, timeMin, timeMaxDate.toISOString(), 100);
     return res.status(200).json({ events });
   }catch(err){
     console.error('listEvents error:', err.message);
@@ -189,10 +194,10 @@ async function handleListEvents(req, res){
 /* ---------- Create event ---------- */
 async function handleCreateEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
-  if(!(await isUserSubscribed(decoded.uid))){
+  if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).json({ error: 'An active subscription is needed to create calendar events.' });
   }
 
@@ -212,13 +217,13 @@ async function handleCreateEvent(req, res){
     return res.status(400).json({ error: "That time has already passed — you can't create an event in the past." });
   }
   try{
-    const result = await createEvent(decoded.uid, {
+    const result = await createEvent(ctx.orgId, {
       summary, description: description || '',
       startISO: start.toISOString(), endISO: end.toISOString(),
       needsMeet: !!needsMeet,
       attendeeEmail: Array.isArray(attendeeEmails) && attendeeEmails[0] ? attendeeEmails[0] : undefined
     });
-    await logEvent('calendar_event_created', { uid: decoded.uid, detail: summary, ip });
+    await logEvent('calendar_event_created', { uid: ctx.uid, orgId: ctx.orgId, detail: summary, ip });
     return res.status(200).json({ ok: true, eventId: result.eventId, meetLink: result.meetLink, htmlLink: result.htmlLink });
   }catch(err){
     console.error('createEvent error:', err.message);
@@ -229,10 +234,10 @@ async function handleCreateEvent(req, res){
 /* ---------- Update event ---------- */
 async function handleUpdateEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
-  if(!(await isUserSubscribed(decoded.uid))){
+  if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).json({ error: 'An active subscription is needed to edit calendar events.' });
   }
 
@@ -252,8 +257,8 @@ async function handleUpdateEvent(req, res){
   }
 
   try{
-    const result = await updateEvent(decoded.uid, eventId, { startISO, endISO, summary, description, attendeeEmails, needsMeet: !!needsMeet });
-    await logEvent('calendar_event_updated', { uid: decoded.uid, detail: eventId });
+    const result = await updateEvent(ctx.orgId, eventId, { startISO, endISO, summary, description, attendeeEmails, needsMeet: !!needsMeet });
+    await logEvent('calendar_event_updated', { uid: ctx.uid, orgId: ctx.orgId, detail: eventId });
     return res.status(200).json({ ok: true, meetLink: result.meetLink || null });
   }catch(err){
     console.error('updateEvent error:', err.message);
@@ -264,10 +269,10 @@ async function handleUpdateEvent(req, res){
 /* ---------- Delete event ---------- */
 async function handleDeleteEvent(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
-  if(!(await isUserSubscribed(decoded.uid))){
+  if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).json({ error: 'An active subscription is needed to delete calendar events.' });
   }
 
@@ -275,8 +280,8 @@ async function handleDeleteEvent(req, res){
   if(!eventId) return res.status(400).json({ error: 'Missing eventId.' });
 
   try{
-    await deleteEvent(decoded.uid, eventId);
-    await logEvent('calendar_event_deleted', { uid: decoded.uid, detail: eventId });
+    await deleteEvent(ctx.orgId, eventId);
+    await logEvent('calendar_event_deleted', { uid: ctx.uid, orgId: ctx.orgId, detail: eventId });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error('deleteEvent error:', err.message);

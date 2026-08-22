@@ -10,6 +10,19 @@ document.querySelectorAll('#settingsSubNav .settings-subnav-item').forEach(item=
   });
 });
 
+/* Workspace configuration is admin+. Members see the settings, but the
+   controls that write to it are disabled — enforced in the rules regardless,
+   this just avoids offering an action that will be refused. */
+function applySettingsRoleGate(){
+  const canEdit = (typeof roleAtLeast !== 'function') || roleAtLeast('admin');
+  if(canEdit) return;
+  ['addTeamMemberBtn','addAutomationBtn','addStageBtn','addStatusBtn','addSourceBtn',
+   'addLostReasonBtn','addTargetBtn','resetDataBtn','settingsWorkspaceName']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.disabled = true; });
+  const note = document.getElementById('settingsRoleNote');
+  if(note) note.style.display = 'block';
+}
+
 function renderSettings(){
   document.getElementById('settingsWorkspaceName').value = DATA.settings.workspaceName;
   refreshConnectionStatus();
@@ -18,8 +31,11 @@ function renderSettings(){
   renderCustomFieldEditor('contact');
   renderCustomFieldEditor('deal');
   renderTeamMemberEditor();
+  renderMembers();
   renderLostReasonEditor();
   renderTargetEditor();
+  renderAutomations();
+  applySettingsRoleGate();
 
   document.getElementById('stageEditorList').innerHTML = DATA.stages.map((s,i)=>`
     <div class="stage-editor-row">
@@ -319,6 +335,14 @@ const socialConnected = { meta:false, instagram:false, tiktok:false };
 SOCIAL_BUTTONS.forEach(cfg=>{
   document.getElementById(cfg.btn).addEventListener('click', async ()=>{
     if(!requireSubscriptionForAction()) return;
+    // Integrations belong to the workspace, so connecting or disconnecting
+    // one is an admin action. Enforced server-side too — this is only to
+    // avoid sending a request that will be refused.
+    if(typeof roleAtLeast === 'function' && !roleAtLeast('admin')){
+      await showAlert('Only an owner or admin can connect or disconnect integrations for this workspace.',
+        { title:'Not permitted' });
+      return;
+    }
     if(!socialConnected[cfg.key]){
       window.location.href = `${BACKEND_BASE}${cfg.connectPath}`;
       return;
@@ -373,6 +397,12 @@ async function refreshConnectionStatus(){
         : `<div class="info-row"><span>${cfg.name}</span><span style="color:var(--graphite);">Not connected</span></div>`;
     });
     el.innerHTML = rows.join('') + (data.note ? `<p class="topbar-sub" style="margin-top:8px;">${escapeHtml(data.note)}</p>` : '');
+    // Publish for the dashboard checklist — derived from the same live
+    // status the panel shows, so the two can never disagree.
+    if(typeof INTEGRATION_STATE !== 'undefined'){
+      INTEGRATION_STATE.social = SOCIAL_BUTTONS.some(cfg => socialConnected[cfg.key]);
+      if(typeof renderOnboarding === 'function') renderOnboarding();
+    }
   }catch(err){
     el.innerHTML = '<p class="topbar-sub">Could not reach the backend right now.</p>';
   }
@@ -546,4 +576,267 @@ document.getElementById('importContactsCsvFile').addEventListener('change', asyn
     e.target.value = '';
   };
   reader.readAsText(file);
+});
+
+
+/* ---- People with access --------------------------------------------------
+   The roster in "Names for assignment" (DATA.teamMembers) and the people
+   listed here are deliberately separate concepts. A teamMember is a label a
+   deal can be assigned to; a member is someone who can sign in. Inviting
+   someone creates both and links them by uid, so deals keep pointing at a
+   stable teamMember id even after that person is removed. */
+const ROLE_LABELS = { owner:'Owner', admin:'Admin', member:'Member', viewer:'Viewer' };
+
+async function renderMembers(){
+  const list = document.getElementById('membersList');
+  if(!list) return;
+  if(!ORG_CONTEXT){
+    list.innerHTML = '<p class="topbar-sub">Sign in to manage your team.</p>';
+    return;
+  }
+  list.innerHTML = '<p class="topbar-sub">Loading…</p>';
+  const data = await listMembers();
+  if(!data){
+    list.innerHTML = '<p class="topbar-sub">Could not load the team list.</p>';
+    return;
+  }
+
+  const canManage = ['owner','admin'].includes(data.yourRole);
+  const isOwner = data.yourRole === 'owner';
+  document.getElementById('seatCount').textContent = `${data.seatsUsed} of ${data.seatLimit} seats used`;
+  if(typeof INTEGRATION_STATE !== 'undefined'){
+    // "Invited a team member" means more than just the owner.
+    INTEGRATION_STATE.team = (data.members.filter(m => m.status !== 'removed').length + data.pending.length) > 1;
+    if(typeof renderOnboarding === 'function') renderOnboarding();
+  }
+  document.getElementById('inviteForm').style.display =
+    (canManage && data.seatsUsed < data.seatLimit) ? 'block' : 'none';
+
+  const active = data.members.filter(m => m.status !== 'removed');
+  const rows = active.map(m => {
+    const you = m.uid === data.yourUid;
+    const roleCell = (isOwner && !you)
+      ? `<select data-role-for="${m.uid}" style="width:auto;padding:5px 8px;font-size:13px;">
+           ${['owner','admin','member','viewer'].map(r=>`<option value="${r}" ${m.role===r?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+         </select>`
+      : `<span class="tag ${m.role==='owner'?'':'tag-other'}">${ROLE_LABELS[m.role]||m.role}</span>`;
+    const statusNote = m.status === 'invited'
+      ? '<span class="tag tag-lead" style="margin-left:6px;">Invited</span>' : '';
+    const removeBtn = (canManage && !you && m.role !== 'owner')
+      ? `<button class="btn btn-danger-ghost btn-sm" data-remove-uid="${m.uid}">Remove</button>` : '';
+    const resendBtn = (canManage && m.status === 'invited')
+      ? `<button class="btn btn-ghost btn-sm" data-resend="${escapeHtml(m.email)}">Resend</button>` : '';
+    return `<div class="info-row">
+      <span style="min-width:0;">
+        <strong>${escapeHtml(m.displayName || m.email || 'Pending')}</strong>${you?' <span class="topbar-sub">(you)</span>':''}${statusNote}
+        <div class="topbar-sub" style="font-size:11.5px;">${escapeHtml(m.email)}</div>
+      </span>
+      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${roleCell}${resendBtn}${removeBtn}</span>
+    </div>`;
+  });
+
+  const pendingRows = data.pending.map(p => `<div class="info-row">
+      <span style="min-width:0;">
+        <strong>${escapeHtml(p.email)}</strong> <span class="tag tag-lead">Invited</span>
+        <div class="topbar-sub" style="font-size:11.5px;">No account yet — they join when they first sign in</div>
+      </span>
+      <span style="display:flex;gap:6px;align-items:center;">
+        <span class="tag tag-other">${ROLE_LABELS[p.role]||p.role}</span>
+        ${canManage ? `<button class="btn btn-ghost btn-sm" data-resend="${escapeHtml(p.email)}">Resend</button>
+                       <button class="btn btn-danger-ghost btn-sm" data-cancel-invite="${escapeHtml(p.email)}">Cancel</button>` : ''}
+      </span>
+    </div>`);
+
+  list.innerHTML = [...rows, ...pendingRows].join('') || '<p class="topbar-sub">No one else has access yet.</p>';
+
+  list.querySelectorAll('[data-role-for]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const r = await setMemberRole(sel.dataset.roleFor, sel.value);
+      if(!r.ok) await showAlert(r.data.error || 'Could not change that role.');
+      renderMembers();
+    });
+  });
+  list.querySelectorAll('[data-remove-uid]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!(await showConfirm('Remove this person? They lose access immediately. Deals and targets assigned to them keep their name for reporting.',
+        { title:'Remove from team', confirmLabel:'Remove', danger:true }))) return;
+      const r = await removeMember(btn.dataset.removeUid, '');
+      if(!r.ok) await showAlert(r.data.error || 'Could not remove that person.');
+      renderMembers();
+    });
+  });
+  list.querySelectorAll('[data-cancel-invite]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const r = await removeMember('', btn.dataset.cancelInvite);
+      if(!r.ok) await showAlert(r.data.error || 'Could not cancel that invitation.');
+      renderMembers();
+    });
+  });
+  list.querySelectorAll('[data-resend]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const r = await resendInvite(btn.dataset.resend);
+      await showAlert(r.ok ? (r.data.note || 'Invitation refreshed.') : (r.data.error || 'Could not resend.'),
+        { title: r.ok ? 'Invitation refreshed' : 'Could not resend' });
+      renderMembers();
+    });
+  });
+}
+
+document.getElementById('sendInviteBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
+  const email = document.getElementById('inviteEmail').value.trim();
+  const role = document.getElementById('inviteRole').value;
+  const note = document.getElementById('inviteNote');
+  if(!email){ await showAlert('Enter an email address to invite.'); return; }
+
+  const btn = document.getElementById('sendInviteBtn');
+  btn.disabled = true; btn.textContent = 'Inviting…';
+  const r = await inviteMember(email, role);
+  btn.disabled = false; btn.textContent = 'Send invitation';
+
+  if(!r.ok){
+    await showAlert(r.data.error || 'Could not send that invitation.');
+  }else{
+    document.getElementById('inviteEmail').value = '';
+    // Report what actually happened. Claiming an email was sent when it
+    // wasn't would leave someone waiting for a message that never arrives.
+    note.style.display = 'block';
+    if(r.data.emailed){
+      note.style.color = 'var(--graphite)';
+      note.textContent = `Invitation sent to ${email}. They'll join when they sign in with that address.`;
+    }else{
+      note.style.color = 'var(--gold)';
+      const why = r.data.emailReason === 'not_configured'
+        ? 'email sending is not configured on this deployment'
+        : 'the email could not be delivered';
+      note.textContent = `${email} can now join, but no email went out — ${why}. Send them the link to this workspace directly.`;
+    }
+    // Add a matching assignment name so they can be assigned deals at once.
+    if(!DATA.teamMembers.some(m => (m.email||'').toLowerCase() === email.toLowerCase())){
+      DATA.teamMembers.push({ id: uid('tm'), name: email.split('@')[0], email: email.toLowerCase(), linked: true });
+      saveData(DATA);
+    }
+  }
+  renderMembers();
+  renderSettings();
+});
+
+
+/* ---- Automations ---------------------------------------------------------
+   Rules live in DATA.automations, which is a config key — so they persist in
+   the workspace config document alongside stages and custom fields. */
+let editingAutomationId = null;
+
+function renderAutomations(){
+  const el = document.getElementById('automationsList');
+  if(!el) return;
+  const rules = DATA.automations || [];
+  el.innerHTML = rules.length ? rules.map(a => `
+    <div class="info-row">
+      <span style="min-width:0;">
+        <strong style="font-size:13.5px;">${escapeHtml(describeAutomation(a))}</strong>
+        ${a.enabled === false ? '<span class="tag tag-other" style="margin-left:6px;">Paused</span>' : ''}
+      </span>
+      <span style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" data-toggle-auto="${a.id}">${a.enabled === false ? 'Enable' : 'Pause'}</button>
+        <button class="btn btn-ghost btn-sm" data-edit-auto="${a.id}">Edit</button>
+      </span>
+    </div>`).join('')
+    : '<p class="topbar-sub">No rules yet. A good first one: when a contact is created, create a follow-up task in 3 days.</p>';
+
+  el.querySelectorAll('[data-edit-auto]').forEach(b=>
+    b.addEventListener('click', ()=>openAutomationModal(b.dataset.editAuto)));
+  el.querySelectorAll('[data-toggle-auto]').forEach(b=>
+    b.addEventListener('click', ()=>{
+      if(!requireSubscriptionForAction()) return;
+      const a = DATA.automations.find(x=>x.id===b.dataset.toggleAuto);
+      if(a){ a.enabled = a.enabled === false; saveData(DATA); renderAutomations(); }
+    }));
+}
+
+function openAutomationModal(id){
+  editingAutomationId = id || null;
+  const a = id ? (DATA.automations || []).find(x=>x.id===id) : null;
+  document.getElementById('automationModalTitle').textContent = a ? 'Edit rule' : 'New rule';
+
+  const trig = document.getElementById('autoTrigger');
+  trig.innerHTML = Object.entries(AUTOMATION_TRIGGERS)
+    .map(([k,v])=>`<option value="${k}">${escapeHtml(v)}</option>`).join('');
+  const act = document.getElementById('autoAction');
+  act.innerHTML = Object.entries(AUTOMATION_ACTIONS)
+    .map(([k,v])=>`<option value="${k}">${escapeHtml(v)}</option>`).join('');
+  document.getElementById('autoStage').innerHTML =
+    DATA.stages.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  document.getElementById('autoTaskAssign').innerHTML =
+    '<option value="">Nobody in particular</option>' +
+    DATA.teamMembers.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+
+  trig.value = (a && a.when && a.when.event) || 'contact.created';
+  act.value  = (a && a.then && a.then.action) || 'task.create';
+  if(a && a.when && a.when.stage) document.getElementById('autoStage').value = a.when.stage;
+  const p = (a && a.then && a.then.params) || {};
+  document.getElementById('autoTaskTitle').value = p.title || '';
+  document.getElementById('autoTaskDays').value = p.dueInDays !== undefined ? p.dueInDays : 3;
+  document.getElementById('autoTaskPriority').value = p.priority || 'medium';
+  document.getElementById('autoTaskAssign').value = p.assignTo || '';
+  document.getElementById('autoNoteText').value = p.note || '';
+
+  document.getElementById('deleteAutomationBtn').style.display = a ? 'inline-flex' : 'none';
+  syncAutomationFields();
+  document.getElementById('automationModalOverlay').classList.add('active');
+}
+
+/* The stage picker only applies to one trigger, and the parameter fields
+   depend on the action — showing all of them at once invites nonsense rules. */
+function syncAutomationFields(){
+  document.getElementById('autoStageWrap').style.display =
+    document.getElementById('autoTrigger').value === 'deal.stage_changed' ? 'block' : 'none';
+  const isTask = document.getElementById('autoAction').value === 'task.create';
+  document.getElementById('autoTaskParams').style.display = isTask ? 'block' : 'none';
+  document.getElementById('autoNoteParams').style.display = isTask ? 'none' : 'block';
+}
+document.getElementById('autoTrigger').addEventListener('change', syncAutomationFields);
+document.getElementById('autoAction').addEventListener('change', syncAutomationFields);
+document.getElementById('addAutomationBtn').addEventListener('click', ()=>{
+  if(!requireSubscriptionForAction()) return;
+  openAutomationModal(null);
+});
+
+document.getElementById('saveAutomationBtn').addEventListener('click', async ()=>{
+  if(!requireSubscriptionForAction()) return;
+  const event = document.getElementById('autoTrigger').value;
+  const action = document.getElementById('autoAction').value;
+  const params = action === 'task.create'
+    ? { title: document.getElementById('autoTaskTitle').value.trim(),
+        dueInDays: Number(document.getElementById('autoTaskDays').value) || 0,
+        priority: document.getElementById('autoTaskPriority').value,
+        assignTo: document.getElementById('autoTaskAssign').value || null }
+    : { note: document.getElementById('autoNoteText').value.trim() };
+
+  if(action === 'task.create' && !params.title){ await showAlert('Give the task a title.'); return; }
+  if(action === 'activity.log' && !params.note){ await showAlert('Write the note to log.'); return; }
+
+  const when = { event };
+  if(event === 'deal.stage_changed') when.stage = document.getElementById('autoStage').value;
+
+  DATA.automations = DATA.automations || [];
+  if(editingAutomationId){
+    const a = DATA.automations.find(x=>x.id===editingAutomationId);
+    if(a){ a.when = when; a.then = { action, params }; }
+  }else{
+    DATA.automations.push({ id: uid('auto'), enabled: true, when, then: { action, params } });
+  }
+  saveData(DATA);
+  closeModals();
+  renderAutomations();
+});
+
+document.getElementById('deleteAutomationBtn').addEventListener('click', async ()=>{
+  if(!editingAutomationId) return;
+  if(!(await showConfirm('Delete this rule? Tasks it already created are not affected.',
+    { title:'Delete rule', confirmLabel:'Delete', danger:true }))) return;
+  DATA.automations = (DATA.automations || []).filter(a=>a.id!==editingAutomationId);
+  saveData(DATA);
+  closeModals();
+  renderAutomations();
 });

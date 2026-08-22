@@ -51,6 +51,8 @@ document.addEventListener('change', e=>{
     const t = DATA.tasks.find(x=>x.id===e.target.dataset.taskToggle);
     if(t){
       t.done = e.target.checked;
+      // Only on completion, not on un-completing.
+      if(t.done && typeof runAutomations === 'function') runAutomations('task.completed', { task: t });
       if(t.done && t.recurrence && t.recurrence.type!=='none'){
         // Carry the WHOLE task forward. The previous version rebuilt it from
         // six fields, silently dropping notes, assignee and any linked deal

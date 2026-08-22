@@ -29,7 +29,7 @@ function renderContacts(){
   // Primary grouping — the main way to tell potential clients apart from current & past clients
   document.getElementById('contactGroups').innerHTML = contactGroups().map(g=>{
     const count = contactsInGroup(g.key).length;
-    return `<span class="chip ${g.key===contactGroup?'active':''}" data-group="${g.key}">${g.label} (${count})</span>`;
+    return `<span class="chip ${g.key===contactGroup?'active':''}" data-group="${g.key}">${escapeHtml(g.label)} (${count})</span>`;
   }).join('');
   document.querySelectorAll('#contactGroups .chip').forEach(el=>{
     el.addEventListener('click',()=>{ contactGroup=el.dataset.group; contactTag='all'; renderContacts(); });
@@ -60,7 +60,7 @@ function renderContacts(){
       <td><div style="display:flex;align-items:center;"><span class="avatar">${initials(c.name)}</span><div class="name-cell">${escapeHtml(c.name)}</div></div></td>
       <td>${escapeHtml(c.email||'—')}</td>
       <td>${escapeHtml(c.phone||'—')}</td>
-      <td><span class="tag ${tagClass(c.tag)}">${c.tag}</span></td>
+      <td><span class="tag ${tagClass(c.tag)}">${escapeHtml(c.tag||'')}</span></td>
       <td>${escapeHtml((companyById(c.companyId)||{}).name || c.company || '—')}</td>
     </tr>`;
   }).join('');
@@ -206,10 +206,13 @@ document.getElementById('saveContactBtn').addEventListener('click', async ()=>{
     c.companyId=companyId; c.source=source; c.customFields=customFields;
     logActivity(`Updated contact ${name}`);
   } else {
-    DATA.contacts.push({id:uid('c'),name,company:document.getElementById('cCompany').value,
+    const newContact = {id:uid('c'),name,company:document.getElementById('cCompany').value,
       email:document.getElementById('cEmail').value, phone:document.getElementById('cPhone').value,
       tag:document.getElementById('cTag').value, notes:notesHtml,
-      companyId, source, customFields, createdAt:Date.now()});
+      companyId, source, customFields, createdAt:Date.now()};
+    DATA.contacts.push(newContact);
+    // Run AFTER the record exists, so a rule can reference it.
+    if(typeof runAutomations === 'function') runAutomations('contact.created', { contact: newContact });
     logActivity(`Added contact ${name}`);
   }
   saveData(DATA); closeModals(); renderAll();
@@ -240,11 +243,11 @@ function openDrawer(contactId){
   document.getElementById('drawerCompany').textContent = c.company || '';
   document.getElementById('drawerEmail').textContent = c.email || '—';
   document.getElementById('drawerPhone').textContent = c.phone || '—';
-  document.getElementById('drawerTag').innerHTML = `<span class="tag ${tagClass(c.tag)}">${c.tag}</span>`;
+  document.getElementById('drawerTag').innerHTML = `<span class="tag ${tagClass(c.tag)}">${escapeHtml(c.tag||'')}</span>`;
   document.getElementById('drawerNotes').innerHTML = c.notes ? sanitizeHtml(c.notes) : '<span class="topbar-sub">No notes yet.</span>';
   const deals = DATA.deals.filter(d=>d.contactId===c.id);
   document.getElementById('drawerDeals').innerHTML = deals.length ? deals.map(d=>`
-    <div class="info-row"><span>${escapeHtml(d.title)} <span class="topbar-sub" style="font-size:11px;">(${d.stage})</span></span><span>${fmtMoney(d.value)}</span></div>
+    <div class="info-row"><span>${escapeHtml(d.title)} <span class="topbar-sub" style="font-size:11px;">(${escapeHtml(d.stage||'')})</span></span><span>${fmtMoney(d.value)}</span></div>
   `).join('') : '<p class="topbar-sub">No deals yet.</p>';
   renderContactActivityTimeline(contactId);
   // The feed holds only a recent page, so fetch this contact's own history

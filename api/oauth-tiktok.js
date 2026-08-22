@@ -9,6 +9,7 @@ const { setConnection } = require('../lib/tokenStore');
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
+const { resolveOrgContext, roleAtLeast } = require('../lib/orgContext');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
 const crypto = require('crypto');
 
@@ -19,7 +20,15 @@ async function handleStart(req, res){
   }catch(err){
     return res.status(err.status||401).send('You need to be signed in to connect a social account. Go back to the CRM, sign in with Google, and try again.');
   }
-  if(!(await isUserSubscribed(decoded.uid))){
+  // Integrations belong to the workspace, so connecting one is an
+  // organisation-level change — admin or owner only.
+  let startCtx;
+  try{ startCtx = await resolveOrgContext(req); }
+  catch(err){ return res.status(err.status||401).send('Could not verify your workspace. Reload the CRM and try again.'); }
+  if(!roleAtLeast(startCtx.role, 'admin')){
+    return res.status(403).send('Only an owner or admin can connect TikTok for this workspace.');
+  }
+  if(!(await isUserSubscribed(startCtx.organisation.ownerId || startCtx.uid))){
     return res.status(402).send('An active subscription is needed to connect social accounts. Go back to the CRM and subscribe from the Billing tab first.');
   }
   const ip = clientIp(req);
@@ -57,9 +66,11 @@ async function handleCallback(req, res){
     return res.end();
   }
 
-  let decoded;
+  let ctx;
   try{
-    decoded = await verifySession(req);
+    // The connection is stored against the ORGANISATION, so resolve full
+    // context rather than just the signed-in uid.
+    ctx = await resolveOrgContext(req);
   }catch(err){
     res.writeHead(302, { Location: `${crmUrl}?social_connect=tiktok_error` });
     return res.end();
@@ -91,13 +102,13 @@ async function handleCallback(req, res){
       displayName = profileData.data && profileData.data.user ? profileData.data.user.display_name : '';
     }catch(e){ /* cosmetic only */ }
 
-    await setConnection(decoded.uid, 'tiktok', {
+    await setConnection(ctx.orgId, 'tiktok', {
       refreshToken: tokenData.refresh_token,
       openId: tokenData.open_id,
       displayName,
       connectedAt: Date.now()
     });
-    await logEvent('tiktok_connected', { uid: decoded.uid, detail: displayName });
+    await logEvent('tiktok_connected', { uid: ctx.uid, orgId: ctx.orgId, detail: displayName });
 
     res.writeHead(302, { Location: `${crmUrl}?social_connect=tiktok_success` });
     res.end();

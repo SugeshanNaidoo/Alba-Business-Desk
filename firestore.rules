@@ -171,9 +171,15 @@ service cloud.firestore {
 
     /* Workspace configuration — stages, statuses, custom field definitions,
        targets. Bounded and always read together, so one document. */
+    /* Workspace configuration: pipeline stages, custom field definitions,
+       lead sources, sales targets, the assignment roster and AUTOMATIONS.
+       These shape how the whole workspace behaves — an automation in
+       particular acts on everyone's records — so this is admin+, not a
+       normal member write. */
     match /organisations/{orgId}/config/{docId} {
       allow read:  if isActiveMember(orgId);
-      allow write: if validCrmWrite(orgId);
+      allow write: if isOrgAdmin(orgId) && orgIsSubscribed(orgId)
+                   && isReasonableSize() && noServerFields();
     }
     match /organisations/{orgId}/socialSnapshots/{snapId} {
       allow read:  if isActiveMember(orgId);
@@ -251,7 +257,10 @@ service cloud.firestore {
     // Google Calendar): backend-only, always. {platform} is a wildcard —
     // this one rule covers every platform name without needing its own
     // entry per platform.
-    match /social_connections/{platform} {
+    /* OAuth tokens, keyed {orgId}_{platform}. Deliberately OUTSIDE
+       organisations/ so no membership rule can ever expose them — physical
+       separation, not just a rule. Server-side only, always. */
+    match /social_connections/{connectionKey} {
       allow read, write: if false;
     }
 
@@ -260,6 +269,14 @@ service cloud.firestore {
     match /audit_logs/{logId} {
       allow read, write: if false;
     }
+    /* Invitations addressed to people who don't have an account yet. The
+       document id is a hash of the email, so this collection can never be
+       read as a list of addresses — and it is server-side only regardless.
+       Conversion to real membership happens during bootstrap. */
+    match /pendingInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
     match /rate_limits/{key} {
       allow read, write: if false;
     }

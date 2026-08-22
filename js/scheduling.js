@@ -32,6 +32,10 @@ async function refreshGcalStatus(){
       textEl.textContent = `Connected${data.calendarEmail ? ' — '+data.calendarEmail : ''}`;
       btnLabel.textContent = 'Disconnect Google Calendar';
       gcalConnected = true;
+      if(typeof INTEGRATION_STATE !== 'undefined'){
+        INTEGRATION_STATE.calendar = true;
+        if(typeof renderOnboarding === 'function') renderOnboarding();
+      }
       hint.textContent = 'Connected. Click any day to see, add, or edit its events.';
       eventsPanel.style.display = 'block';
       loadCalendarEvents();
@@ -39,6 +43,7 @@ async function refreshGcalStatus(){
       textEl.textContent = 'Not connected';
       btnLabel.textContent = 'Connect Google Calendar';
       gcalConnected = false;
+      if(typeof INTEGRATION_STATE !== 'undefined') INTEGRATION_STATE.calendar = false;
       hint.textContent = 'Connect your calendar to see, create, and manage events right here.';
       eventsPanel.style.display = 'none';
     }
@@ -50,6 +55,11 @@ async function refreshGcalStatus(){
    connected, matching how the social platform buttons behave. */
 document.getElementById('connectGoogleCalendarBtn').addEventListener('click', async ()=>{
   if(!requireSubscriptionForAction()) return;
+  if(typeof roleAtLeast === 'function' && !roleAtLeast('admin')){
+    await showAlert('Only an owner or admin can connect or disconnect the calendar for this workspace.',
+      { title:'Not permitted' });
+    return;
+  }
   if(!gcalConnected){
     window.location.href = `${BACKEND_BASE}/api/calendar?action=connect`;
     return;

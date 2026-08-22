@@ -31,7 +31,8 @@ const ENTITY_STORES = {
    always loaded as a unit, so splitting them into per-record documents would
    cost reads for no benefit. */
 const CONFIG_KEYS = ['settings','stages','contactStatuses','leadSources',
-                     'customFieldDefs','teamMembers','lostReasons','salesTargets'];
+                     'customFieldDefs','teamMembers','lostReasons','salesTargets',
+                     'automations'];
 
 /* Entities the rules treat as append-only history: create is allowed, update
    and delete are denied. The sync must respect that, or every save would
@@ -46,6 +47,7 @@ let _activityHasMore = false;
 
 const _lastSynced = {};        // entity -> Map(id -> serialised record)
 let _lastConfig = null;        // serialised config, to detect changes
+let _warnedConfigDenied = false;
 
 function orgRef(){
   return (cloudDb && currentOrgId())
@@ -262,7 +264,19 @@ async function syncWorkspace(){
     }
   }catch(err){
     console.error('Could not save workspace configuration:', err);
-    _reportWriteFailure(err);
+    if(err && err.code === 'permission-denied'){
+      // Configuration is admin+. A member editing something that lives in
+      // config would otherwise retry the same rejected write on every save.
+      // Advance the baseline so it is attempted once, not endlessly.
+      _lastConfig = JSON.stringify(_configOf(DATA));
+      if(!_warnedConfigDenied){
+        _warnedConfigDenied = true;
+        showAlert('Only an owner or admin can change workspace settings. Your other changes were saved.',
+          { title:'Not permitted' });
+      }
+    }else{
+      _reportWriteFailure(err);
+    }
   }
 
   // Entities — per-record upserts and deletes.

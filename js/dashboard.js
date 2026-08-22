@@ -6,6 +6,7 @@ let activityFeedLimit = 8;
 
 /* ---------- Render: Dashboard ---------- */
 function renderDashboard(){
+  renderOnboarding();
   const openDeals = DATA.deals.filter(d=>d.stage!=='Won'&&d.stage!=='Lost');
   const wonDeals = DATA.deals.filter(d=>d.stage==='Won');
   const pipelineValue = openDeals.reduce((s,d)=>s+Number(d.value||0),0);
@@ -97,4 +98,110 @@ document.getElementById('loadMoreActivityBtn').addEventListener('click', async (
   btn.disabled = false; btn.textContent = 'Load older activity';
   renderDashboard();
   if(!res.hasMore) btn.style.display = 'none';
+});
+
+
+/* ---- Onboarding checklist ------------------------------------------------
+   Completion is DERIVED from real data, never stored as flags. A stored flag
+   drifts: delete your only contact and a flag would still claim the step was
+   done. Deriving it means the checklist can only ever tell the truth.
+
+   The one thing that IS persisted is dismissal — that's a preference, not a
+   fact about the data. */
+
+// Integration status is asynchronous, so the panels that check it publish
+// what they found here. Unknown reads as "not done" rather than blocking.
+const INTEGRATION_STATE = { calendar:false, social:false, team:false };
+
+function onboardingSteps(){
+  const named = (DATA.settings.workspaceName || '').trim();
+  return [
+    { key:'name',     label:'Name your workspace',
+      done: !!named && named !== 'Alba Business Desk',
+      action:()=>{ showView('settings'); } },
+    { key:'contact',  label:'Add your first contact',
+      done: DATA.contacts.length > 0,
+      action:()=>{ showView('contacts'); setTimeout(()=>document.getElementById('addContactBtn').click(), 120); } },
+    { key:'deal',     label:'Create your first deal',
+      done: DATA.deals.length > 0,
+      action:()=>{ showView('deals'); setTimeout(()=>document.getElementById('addDealBtn').click(), 120); } },
+    { key:'task',     label:'Add a task',
+      done: DATA.tasks.length > 0,
+      action:()=>{ showView('tasks'); setTimeout(()=>document.getElementById('addTaskBtn').click(), 120); } },
+    { key:'calendar', label:'Connect Google Calendar',
+      done: INTEGRATION_STATE.calendar,
+      action:()=>{ showView('scheduling'); } },
+    { key:'social',   label:'Connect a social account',
+      done: INTEGRATION_STATE.social,
+      action:()=>{ showView('settings'); } },
+    { key:'team',     label:'Invite a team member',
+      done: INTEGRATION_STATE.team,
+      action:()=>{ showView('settings'); } }
+  ];
+}
+
+/* Integration status is only known once the relevant tab has been opened, so
+   on a first dashboard load a connected integration would wrongly show as
+   incomplete. This fetches it once — but ONLY while the checklist is
+   actually visible, which is true for new workspaces and nobody else. An
+   established user who has dismissed or completed it pays nothing. */
+let _onboardingStatusFetched = false;
+async function fetchOnboardingStatus(){
+  if(_onboardingStatusFetched || !ORG_CONTEXT) return;
+  _onboardingStatusFetched = true;
+  try{
+    const [social, cal, team] = await Promise.all([
+      fetch(`${BACKEND_BASE}/api/social-sync?action=status`, { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch(`${BACKEND_BASE}/api/calendar?action=status`,     { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
+      typeof listMembers === 'function' ? listMembers() : null
+    ]);
+    if(social) INTEGRATION_STATE.social = ['meta','instagram','tiktok'].some(k => social[k] && social[k].connected);
+    if(cal)    INTEGRATION_STATE.calendar = !!cal.connected;
+    if(team)   INTEGRATION_STATE.team = (team.members.filter(m=>m.status!=='removed').length + team.pending.length) > 1;
+    renderOnboarding();
+  }catch(err){
+    // Non-fatal: the checklist just shows those steps as not yet done.
+    console.error('Could not check setup status:', err);
+  }
+}
+
+function renderOnboarding(){
+  const panel = document.getElementById('onboardingPanel');
+  if(!panel) return;
+
+  // Hidden once dismissed, or once everything is done — a permanently
+  // complete checklist is just clutter.
+  // Per-user, not workspace config: one person dismissing this must not
+  // hide it for their colleagues, and a member shouldn't need write access
+  // to shared settings just to tidy their own dashboard.
+  let dismissed = false;
+  try{ dismissed = localStorage.getItem('abd_onboarding_dismissed') === '1'; }catch(e){}
+  if(dismissed){ panel.style.display = 'none'; return; }
+
+  const steps = onboardingSteps();
+  const doneCount = steps.filter(s => s.done).length;
+  if(doneCount === steps.length){ panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  fetchOnboardingStatus();   // once, and only while the checklist is showing
+  document.getElementById('onboardingProgress').textContent = `${doneCount} of ${steps.length} done`;
+  document.getElementById('onboardingBarFill').style.width = `${Math.round((doneCount/steps.length)*100)}%`;
+
+  document.getElementById('onboardingSteps').innerHTML = steps.map((s,i)=>`
+    <div class="onboarding-step ${s.done?'done':''}">
+      <div class="onboarding-check">✓</div>
+      <div class="onboarding-label">${escapeHtml(s.label)}</div>
+      ${s.done ? '' : `<button class="btn btn-ghost btn-sm" data-onboard-step="${i}">Do it</button>`}
+    </div>`).join('');
+
+  document.querySelectorAll('[data-onboard-step]').forEach(btn=>{
+    btn.addEventListener('click', ()=> steps[Number(btn.dataset.onboardStep)].action());
+  });
+}
+
+document.getElementById('dismissOnboardingBtn').addEventListener('click', async ()=>{
+  if(!(await showConfirm('Hide this checklist? You can still do any of these steps later — this just clears it from your dashboard.',
+    { title:'Dismiss setup checklist', confirmLabel:'Hide it' }))) return;
+  try{ localStorage.setItem('abd_onboarding_dismissed', '1'); }catch(e){}
+  renderOnboarding();
 });

@@ -133,6 +133,24 @@ async function refreshSubscriptionStatus(){
       lastPaymentRow.style.display = 'none';
     }
     document.getElementById('subscribeBanner').style.display = isActive ? 'none' : 'flex';
+
+    // Billing is owner-only, enforced server-side. Hide the controls from
+    // everyone else rather than letting them click into a 403 — and hide the
+    // "subscribe" prompt too, since a member genuinely cannot act on it.
+    const isOwner = (typeof roleAtLeast === 'function') ? roleAtLeast('owner') : true;
+    if(!isOwner){
+      subscribeBtn.style.display = 'none';
+      cancelBtn.style.display = 'none';
+      const del = document.getElementById('billingDeleteAccountBtn');
+      if(del) del.style.display = 'none';
+      const banner = document.getElementById('subscribeBanner');
+      if(banner && !isActive){
+        banner.querySelector('span').textContent =
+          'This workspace does not have an active subscription. Ask the workspace owner to subscribe.';
+        const bBtn = document.getElementById('subscribeBannerBtn');
+        if(bBtn) bBtn.style.display = 'none';
+      }
+    }
     // First check after signing in: if not subscribed, take them straight
     // to Billing rather than leaving them to stumble on it — they can
     // still navigate anywhere else from there, this is a one-time nudge.

@@ -153,6 +153,7 @@ function defaultData(){
       {id:'lr6',name:'Other'}
     ],
     salesTargets:[],
+    automations:[],
     companies:[],
     contacts:[],
     deals:[],

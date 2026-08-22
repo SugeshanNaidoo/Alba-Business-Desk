@@ -15,16 +15,17 @@ const { fetchInstagram, fetchFacebook, fetchTikTok } = require('../lib/platformF
 const { checkRateLimit } = require('../lib/rateLimit');
 const { logEvent, clientIp } = require('../lib/auditLog');
 const { verifySession } = require('../lib/session');
+const { resolveOrgContext, roleAtLeast } = require('../lib/orgContext');
 const { isUserSubscribed } = require('../lib/subscriptionCheck');
 
 
 
 async function handlePlatformSync(req, res){
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){ return res.status(err.status||401).json({ error: 'You need to be signed in to sync social data.' }); }
-  if(!(await isUserSubscribed(decoded.uid))){
+  if(!(await isUserSubscribed(ctx.organisation.ownerId || ctx.uid))){
     return res.status(402).json({ error: 'An active subscription is needed to sync social data.' });
   }
   const ip = clientIp(req);
@@ -35,10 +36,10 @@ async function handlePlatformSync(req, res){
   const fn = fetchers[req.query.platform];
   if(!fn) return res.status(400).json({ error: 'Unknown platform. Use ?platform=instagram, facebook, or tiktok.' });
   try{
-    const data = await fn(decoded.uid);
+    const data = await fn(ctx.orgId);
     return res.status(200).json(data);
   }catch(err){
-    console.error(`Sync failed for uid=${decoded.uid} platform=${req.query.platform}:`, err.message, err.stack ? '\n'+err.stack : '');
+    console.error(`Sync failed for org=${ctx.orgId} platform=${req.query.platform}:`, err.message, err.stack ? '\n'+err.stack : '');
     return res.status(502).json({ error: err.message });
   }
 }
@@ -48,16 +49,19 @@ async function handlePlatformSync(req, res){
 // ends rather than us simply forgetting the token.
 async function handleDisconnect(req, res){
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  let decoded;
-  try{ decoded = await verifySession(req, { requireCsrf: true }); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req, { requireCsrf: true }); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
 
+  if(!roleAtLeast(ctx.role, 'admin')){
+    return res.status(403).json({ error: 'Only an owner or admin can disconnect integrations.' });
+  }
   const platform = req.query.platform;
   if(!['meta','instagram','tiktok'].includes(platform)){
     return res.status(400).json({ error: 'Unknown platform.' });
   }
   try{
-    const conn = await getConnection(decoded.uid, platform);
+    const conn = await getConnection(ctx.orgId, platform);
     if(conn){
       try{
         if(platform === 'meta' && conn.pageAccessToken){
@@ -81,8 +85,8 @@ async function handleDisconnect(req, res){
         console.error(`Revoke call failed for ${platform} (continuing to delete locally):`, e.message);
       }
     }
-    await deleteConnection(decoded.uid, platform);
-    await logEvent(`${platform}_disconnected`, { uid: decoded.uid });
+    await deleteConnection(ctx.orgId, platform);
+    await logEvent(`${platform}_disconnected`, { uid: ctx.uid, orgId: ctx.orgId });
     return res.status(200).json({ ok: true });
   }catch(err){
     console.error(err);
@@ -91,13 +95,13 @@ async function handleDisconnect(req, res){
 }
 
 async function handleStatus(req, res){
-  let decoded;
-  try{ decoded = await verifySession(req); }
+  let ctx;
+  try{ ctx = await resolveOrgContext(req); }
   catch(err){ return res.status(err.status||401).json({ error: err.message }); }
   try{
-    const meta = await getConnection(decoded.uid, 'meta').catch(()=>null);
-    const instagram = await getConnection(decoded.uid, 'instagram').catch(()=>null);
-    const tiktok = await getConnection(decoded.uid, 'tiktok').catch(()=>null);
+    const meta = await getConnection(ctx.orgId, 'meta').catch(()=>null);
+    const instagram = await getConnection(ctx.orgId, 'instagram').catch(()=>null);
+    const tiktok = await getConnection(ctx.orgId, 'tiktok').catch(()=>null);
     res.status(200).json({
       meta: meta ? { connected:true, pageName: meta.pageName||'' } : { connected:false },
       instagram: instagram ? { connected:true, username: instagram.username||'' } : { connected:false },
@@ -128,10 +132,10 @@ async function handleScheduled(req, res){
 
     const results = [];
     for(const subDoc of activeSubs.docs){
+      // subscriptions/{uid} is keyed on the OWNER's uid (PayFast binds it
+      // there), so this resolves owner -> organisation.
       const uid = subDoc.id;
       try{
-        // Resolve the user's organisation — social data now lives in its
-        // subcollections rather than a single workspace document.
         const userSnap = await db.collection('users').doc(uid).get();
         const orgId = userSnap.exists ? userSnap.data().activeOrganisationId : null;
         if(!orgId){ results.push({ uid, skipped:true, reason:'No organisation' }); continue; }
@@ -153,7 +157,7 @@ async function handleScheduled(req, res){
           const platform = platforms.find(p => p.name === platformName);
           if(!platform) continue;
           try{
-            const result = await fetcher(uid);
+            const result = await fetcher(orgId);   // connections are org-owned
             const batch = db.batch();
 
             if(typeof result.followers === 'number'){
